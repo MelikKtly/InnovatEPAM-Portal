@@ -8,6 +8,14 @@
 
 **Input**: User description: "InnovatEPAM Portal is a comprehensive digital platform designed to streamline the innovation process within EPAM, enabling employees to submit creative ideas, facilitating expert evaluation, and managing the implementation of top-tier innovations. High-Level Features: (1) User Authentication System — employee registration with email and password, login/logout, role-based access (Submitter, Admin/Evaluator). (2) Intelligent Idea Submission System — title, description, category (Technical Innovation, Process Improvement, Client Solutions, Cost Reduction), single file attachment per idea, listing page, detail view. (3) Admin Evaluation Workflow — status tracking (submitted → under review → accepted/rejected), accept/reject with written feedback, admin dashboard."
 
+## Clarifications
+
+### Session 2026-05-14
+
+- Q: Should registration be restricted to EPAM email domains? → A: Yes — only `@epam.com` and a configurable allow-list of EPAM subdomains may register.
+- Q: Who can see ideas in which statuses? → A: Non-admins see submitted / under review / accepted ideas; rejected ideas are hidden from everyone except their own submitter and admins.
+- Q: What is the session lifetime? → A: 7-day rolling (each request refreshes expiry) with a 30-day absolute cap.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Submit and browse innovation ideas (Priority: P1)
@@ -81,9 +89,9 @@ A new EPAM employee registers an account with email and password, signs in, and 
 
 **Authentication & Authorization**
 
-- **FR-001**: System MUST allow visitors to register an account using an email address and a password.
+- **FR-001**: System MUST allow visitors to register an account using an email address and a password, accepting only emails whose domain matches `epam.com` or an entry on a configurable allow-list of EPAM subdomains; all other email domains MUST be rejected with a clear message.
 - **FR-002**: System MUST reject registration when the email is already associated with an existing account.
-- **FR-003**: System MUST authenticate users by email and password and maintain a signed-in session until the user signs out or the session expires.
+- **FR-003**: System MUST authenticate users by email and password and maintain a signed-in session that remains valid for 7 days from the most recent authenticated request (sliding/rolling expiry) and MUST be terminated at the latest 30 days after sign-in regardless of activity (absolute cap).
 - **FR-004**: System MUST provide a sign-out action that ends the current session.
 - **FR-005**: System MUST assign every newly registered account the Submitter role by default.
 - **FR-006**: System MUST support exactly two roles in this release: Submitter and Admin/Evaluator.
@@ -102,9 +110,9 @@ A new EPAM employee registers an account with email and password, signs in, and 
 
 **Listing & Detail**
 
-- **FR-016**: System MUST provide an ideas listing visible to any signed-in user, showing every idea with title, category, submitter, submission date, and current status.
+- **FR-016**: System MUST provide an ideas listing for signed-in users. Admin/Evaluator accounts MUST see all ideas in every status. Submitter accounts MUST see ideas in status submitted, under review, or accepted, plus their own ideas regardless of status; rejected ideas authored by other users MUST NOT appear.
 - **FR-017**: System MUST sort the listing with most recently submitted ideas first.
-- **FR-018**: System MUST provide an idea detail view showing the full title, description, category, submitter, submission date, current status, attachment (if any, downloadable), and evaluator feedback (if any).
+- **FR-018**: System MUST provide an idea detail view showing the full title, description, category, submitter, submission date, current status, attachment (if any, downloadable), and evaluator feedback (if any). Access to the detail view MUST follow the same visibility rules as FR-016: a Submitter requesting a rejected idea authored by someone else MUST be denied access with an authorization error.
 
 **Evaluation Workflow**
 
@@ -112,7 +120,7 @@ A new EPAM employee registers an account with email and password, signs in, and 
 - **FR-020**: System MUST allow an Admin/Evaluator to move an idea from "submitted" to "under review".
 - **FR-021**: System MUST allow an Admin/Evaluator to move an idea from "submitted" or "under review" to "accepted" or "rejected".
 - **FR-022**: System MUST require non-empty written feedback when an Admin/Evaluator records an "accepted" or "rejected" decision, and MUST persist that feedback with the idea.
-- **FR-023**: System MUST show the current status and stored evaluator feedback on the idea detail view to all signed-in viewers.
+- **FR-023**: System MUST show the current status and stored evaluator feedback on the idea detail view to every viewer permitted to see that idea under FR-016 / FR-018.
 - **FR-024**: System MUST provide an admin dashboard, restricted to Admin/Evaluator accounts, that lists every idea with status, with the ability to filter or group by status and to open each idea for action.
 
 **General**
@@ -141,7 +149,7 @@ A new EPAM employee registers an account with email and password, signs in, and 
 
 ## Assumptions
 
-- The portal is for EPAM employees; the registration form does not need third-party identity providers (SSO) in this release.
+- The portal is for EPAM employees; the registration form does not need third-party identity providers (SSO) in this release. Eligibility is enforced by restricting accepted email domains to `epam.com` and a configurable allow-list of EPAM subdomains (see FR-001).
 - Password rules follow common modern practice (minimum length around 8 characters with at least one letter and one digit); the exact policy will be finalized during planning but is not part of feature scope.
 - Password reset / "forgot password" is explicitly out of scope for this release; a forgotten password is handled by an Admin re-issuing credentials.
 - A single seeded Admin/Evaluator account will exist at launch to bootstrap evaluations until other accounts are promoted.

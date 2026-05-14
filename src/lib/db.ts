@@ -28,6 +28,32 @@ function migrate(conn: Database.Database) {
       role          TEXT NOT NULL CHECK (role IN ('submitter', 'admin')),
       created_at    INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS ideas (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      title         TEXT NOT NULL,
+      description   TEXT NOT NULL,
+      category      TEXT NOT NULL CHECK (category IN (
+                      'Technical Innovation',
+                      'Process Improvement',
+                      'Client Solutions',
+                      'Cost Reduction'
+                    )),
+      status        TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN (
+                      'submitted',
+                      'under review',
+                      'accepted',
+                      'rejected'
+                    )),
+      submitter_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      file_path     TEXT,
+      file_name     TEXT,
+      created_at    INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ideas_submitter ON ideas(submitter_id);
+    CREATE INDEX IF NOT EXISTS idx_ideas_created   ON ideas(created_at DESC);
   `);
 }
 
@@ -63,3 +89,37 @@ export type UserRow = {
   role: "submitter" | "admin";
   created_at: number;
 };
+
+export type IdeaCategory =
+  | "Technical Innovation"
+  | "Process Improvement"
+  | "Client Solutions"
+  | "Cost Reduction";
+
+export const IDEA_CATEGORIES: readonly IdeaCategory[] = [
+  "Technical Innovation",
+  "Process Improvement",
+  "Client Solutions",
+  "Cost Reduction",
+] as const;
+
+export type IdeaStatus =
+  | "submitted"
+  | "under review"
+  | "accepted"
+  | "rejected";
+
+export type IdeaRow = {
+  id: number;
+  title: string;
+  description: string;
+  category: IdeaCategory;
+  status: IdeaStatus;
+  submitter_id: number;
+  file_path: string | null;
+  file_name: string | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export type IdeaWithSubmitter = IdeaRow & { submitter_email: string };

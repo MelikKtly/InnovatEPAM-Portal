@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { IdeaStatus } from "@/lib/db";
+import type { IdeaStatus } from "@/lib/idea-constants";
 
 type EvaluateStatus = "under_review" | "accepted" | "rejected";
 

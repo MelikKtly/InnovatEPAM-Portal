@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import type { IdeaStatus } from "@/lib/db";
+import type { IdeaStatus } from "@/lib/idea-constants";
 
 const VARIANT: Record<IdeaStatus, "blue" | "yellow" | "green" | "red"> = {
   submitted: "blue",

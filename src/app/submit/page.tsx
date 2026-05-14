@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { IDEA_CATEGORIES } from "@/lib/db";
+import { IDEA_CATEGORIES } from "@/lib/idea-constants";
 import { cn } from "@/lib/utils";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;

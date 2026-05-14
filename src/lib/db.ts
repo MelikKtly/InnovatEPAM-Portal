@@ -3,6 +3,14 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import bcrypt from "bcryptjs";
 
+import type { IdeaCategory, IdeaStatus } from "@/lib/idea-constants";
+
+export {
+  IDEA_CATEGORIES,
+  type IdeaCategory,
+  type IdeaStatus,
+} from "@/lib/idea-constants";
+
 const DB_PATH = resolve(process.env.DATABASE_PATH ?? "./data/portal.db");
 
 type GlobalWithDb = typeof globalThis & { __portalDb?: Database.Database };
@@ -100,25 +108,6 @@ export type UserRow = {
   role: "submitter" | "admin";
   created_at: number;
 };
-
-export type IdeaCategory =
-  | "Technical Innovation"
-  | "Process Improvement"
-  | "Client Solutions"
-  | "Cost Reduction";
-
-export const IDEA_CATEGORIES: readonly IdeaCategory[] = [
-  "Technical Innovation",
-  "Process Improvement",
-  "Client Solutions",
-  "Cost Reduction",
-] as const;
-
-export type IdeaStatus =
-  | "submitted"
-  | "under review"
-  | "accepted"
-  | "rejected";
 
 export type IdeaRow = {
   id: number;

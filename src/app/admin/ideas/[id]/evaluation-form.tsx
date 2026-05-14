@@ -8,6 +8,7 @@ import { Toast, type ToastMessage } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { StarRating } from "@/components/star-rating";
 import { cn } from "@/lib/utils";
 import type { IdeaStatus } from "@/lib/idea-constants";
 
@@ -52,15 +53,28 @@ function toEvaluateStatus(status: IdeaStatus): EvaluateStatus {
 export function EvaluationForm({
   ideaId,
   currentStatus,
+  initialScores,
 }: {
   ideaId: number;
   currentStatus: IdeaStatus;
+  initialScores?: {
+    impact: number | null;
+    feasibility: number | null;
+    innovation: number | null;
+  };
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<EvaluateStatus>(
     toEvaluateStatus(currentStatus),
   );
   const [feedback, setFeedback] = useState("");
+  const [impact, setImpact] = useState<number>(initialScores?.impact ?? 0);
+  const [feasibility, setFeasibility] = useState<number>(
+    initialScores?.feasibility ?? 0,
+  );
+  const [innovation, setInnovation] = useState<number>(
+    initialScores?.innovation ?? 0,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastMessage>(null);
 
@@ -70,12 +84,25 @@ export function EvaluationForm({
       setToast({ tone: "error", text: "Feedback is required." });
       return;
     }
+    if (impact < 1 || feasibility < 1 || innovation < 1) {
+      setToast({
+        tone: "error",
+        text: "Please rate impact, feasibility and innovation (1–5).",
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/ideas/${ideaId}/evaluate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, feedback: feedback.trim() }),
+        body: JSON.stringify({
+          status,
+          feedback: feedback.trim(),
+          impact_score: impact,
+          feasibility_score: feasibility,
+          innovation_score: innovation,
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -119,6 +146,30 @@ export function EvaluationForm({
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Scoring</Label>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <StarRating
+              label="Impact"
+              hint="Business / user value"
+              value={impact}
+              onChange={setImpact}
+            />
+            <StarRating
+              label="Feasibility"
+              hint="Effort vs. payoff"
+              value={feasibility}
+              onChange={setFeasibility}
+            />
+            <StarRating
+              label="Innovation"
+              hint="Novelty of approach"
+              value={innovation}
+              onChange={setInnovation}
+            />
           </div>
         </div>
 

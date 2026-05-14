@@ -10,14 +10,16 @@ import {
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { IdeaProgress } from "@/components/idea-progress";
+import { ScoreBadge } from "@/components/score-badge";
+import { ScoreBreakdownGrid } from "@/components/score-breakdown";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   getDb,
   type EvaluationWithEvaluator,
-  type IdeaWithSubmitter,
 } from "@/lib/db";
+import { fetchIdeaById } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -44,13 +46,7 @@ export default async function AdminEvaluatePage({
   if (!Number.isInteger(ideaId) || ideaId <= 0) notFound();
 
   const db = getDb();
-  const idea = db
-    .prepare(
-      `SELECT i.*, u.email AS submitter_email
-       FROM ideas i JOIN users u ON u.id = i.submitter_id
-       WHERE i.id = ?`,
-    )
-    .get(ideaId) as IdeaWithSubmitter | undefined;
+  const idea = fetchIdeaById(ideaId);
   if (!idea) notFound();
 
   const evaluations = db
@@ -108,6 +104,14 @@ export default async function AdminEvaluatePage({
 
           <IdeaProgress status={idea.status} />
 
+          <ScoreBreakdownGrid
+            scores={{
+              impact: idea.impact_score,
+              feasibility: idea.feasibility_score,
+              innovation: idea.innovation_score,
+            }}
+          />
+
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">
               <Avatar email={idea.submitter_email} size="md" />
@@ -164,7 +168,15 @@ export default async function AdminEvaluatePage({
               Update the status and leave feedback for the submitter.
             </p>
           </div>
-          <EvaluationForm ideaId={idea.id} currentStatus={idea.status} />
+          <EvaluationForm
+            ideaId={idea.id}
+            currentStatus={idea.status}
+            initialScores={{
+              impact: idea.impact_score,
+              feasibility: idea.feasibility_score,
+              innovation: idea.innovation_score,
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -187,25 +199,52 @@ export default async function AdminEvaluatePage({
             </div>
 
             <div className="space-y-3">
-              {evaluations.map((ev) => (
-                <div
-                  key={ev.id}
-                  className="rounded-xl border border-border/60 bg-muted/30 p-4 text-sm"
-                >
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Avatar email={ev.evaluator_email} size="sm" />
-                      <span className="font-medium text-foreground">
-                        {ev.evaluator_email}
-                      </span>
+              {evaluations.map((ev) => {
+                const scoreVals = [
+                  ev.impact_score,
+                  ev.feasibility_score,
+                  ev.innovation_score,
+                ].filter((v): v is number => typeof v === "number");
+                const avg =
+                  scoreVals.length > 0
+                    ? scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length
+                    : null;
+                return (
+                  <div
+                    key={ev.id}
+                    className="rounded-xl border border-border/60 bg-muted/30 p-4 text-sm"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Avatar email={ev.evaluator_email} size="sm" />
+                        <span className="font-medium text-foreground">
+                          {ev.evaluator_email}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ScoreBadge score={avg} size="sm" />
+                        <span>{formatDateTime(ev.created_at)}</span>
+                      </div>
                     </div>
-                    <span>{formatDateTime(ev.created_at)}</span>
+                    {scoreVals.length === 3 ? (
+                      <div className="mb-2 flex flex-wrap gap-2 text-[11px]">
+                        <span className="rounded-full bg-background/60 px-2 py-0.5">
+                          Impact {ev.impact_score}/5
+                        </span>
+                        <span className="rounded-full bg-background/60 px-2 py-0.5">
+                          Feasibility {ev.feasibility_score}/5
+                        </span>
+                        <span className="rounded-full bg-background/60 px-2 py-0.5">
+                          Innovation {ev.innovation_score}/5
+                        </span>
+                      </div>
+                    ) : null}
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {ev.feedback}
+                    </p>
                   </div>
-                  <p className="whitespace-pre-wrap leading-relaxed">
-                    {ev.feedback}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

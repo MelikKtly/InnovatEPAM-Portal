@@ -5,7 +5,8 @@ import { CheckCircle2, Clock, Inbox, Sparkles } from "lucide-react";
 import { IdeaCard } from "@/components/idea-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDb, type IdeaStatus, type IdeaWithSubmitter } from "@/lib/db";
+import { type IdeaStatus } from "@/lib/db";
+import { fetchAllIdeas, fetchIdeasForSubmitter } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -24,24 +25,8 @@ export default async function IdeasListPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/ideas");
 
-  const db = getDb();
   const ideas =
-    user.role === "admin"
-      ? (db
-          .prepare(
-            `SELECT i.*, u.email AS submitter_email
-             FROM ideas i JOIN users u ON u.id = i.submitter_id
-             ORDER BY i.created_at DESC`,
-          )
-          .all() as IdeaWithSubmitter[])
-      : (db
-          .prepare(
-            `SELECT i.*, u.email AS submitter_email
-             FROM ideas i JOIN users u ON u.id = i.submitter_id
-             WHERE i.submitter_id = ?
-             ORDER BY i.created_at DESC`,
-          )
-          .all(user.id) as IdeaWithSubmitter[]);
+    user.role === "admin" ? fetchAllIdeas() : fetchIdeasForSubmitter(user.id);;
 
   const counts = statCounts(ideas);
 

@@ -11,10 +11,12 @@ import {
 
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
+import { ScoreBadge } from "@/components/score-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDb, type IdeaStatus, type IdeaWithSubmitter } from "@/lib/db";
+import { type IdeaStatus } from "@/lib/db";
+import { fetchAllIdeas } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -31,13 +33,7 @@ export default async function AdminDashboardPage() {
   if (!user) redirect("/login?next=/admin");
   if (user.role !== "admin") redirect("/ideas");
 
-  const ideas = getDb()
-    .prepare(
-      `SELECT i.*, u.email AS submitter_email
-       FROM ideas i JOIN users u ON u.id = i.submitter_id
-       ORDER BY i.created_at DESC`,
-    )
-    .all() as IdeaWithSubmitter[];
+  const ideas = fetchAllIdeas();
 
   const counts: Record<IdeaStatus, number> = {
     submitted: 0,
@@ -146,6 +142,7 @@ export default async function AdminDashboardPage() {
                   <th className="px-5 py-3 font-medium">Idea</th>
                   <th className="px-5 py-3 font-medium">Category</th>
                   <th className="px-5 py-3 font-medium">Submitter</th>
+                  <th className="px-5 py-3 font-medium">Score</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">Submitted</th>
                   <th className="px-5 py-3 text-right font-medium" />
@@ -183,6 +180,9 @@ export default async function AdminDashboardPage() {
                             {idea.submitter_email}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-5 py-3">
+                        <ScoreBadge score={idea.avg_score} size="sm" />
                       </td>
                       <td className="px-5 py-3">
                         <StatusBadge status={idea.status} />

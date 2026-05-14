@@ -64,16 +64,40 @@ function migrate(conn: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_ideas_created   ON ideas(created_at DESC);
 
     CREATE TABLE IF NOT EXISTS evaluations (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      idea_id      INTEGER NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
-      evaluator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      feedback     TEXT NOT NULL,
-      created_at   INTEGER NOT NULL
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      idea_id           INTEGER NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
+      evaluator_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      feedback          TEXT NOT NULL,
+      impact_score      INTEGER CHECK (impact_score      BETWEEN 1 AND 5),
+      feasibility_score INTEGER CHECK (feasibility_score BETWEEN 1 AND 5),
+      innovation_score  INTEGER CHECK (innovation_score  BETWEEN 1 AND 5),
+      created_at        INTEGER NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_evaluations_idea
       ON evaluations(idea_id, created_at DESC);
   `);
+
+  // Idempotent column additions for existing databases.
+  const cols = conn
+    .prepare("PRAGMA table_info(evaluations)")
+    .all() as { name: string }[];
+  const have = new Set(cols.map((c) => c.name));
+  if (!have.has("impact_score")) {
+    conn.exec(
+      "ALTER TABLE evaluations ADD COLUMN impact_score INTEGER CHECK (impact_score BETWEEN 1 AND 5)",
+    );
+  }
+  if (!have.has("feasibility_score")) {
+    conn.exec(
+      "ALTER TABLE evaluations ADD COLUMN feasibility_score INTEGER CHECK (feasibility_score BETWEEN 1 AND 5)",
+    );
+  }
+  if (!have.has("innovation_score")) {
+    conn.exec(
+      "ALTER TABLE evaluations ADD COLUMN innovation_score INTEGER CHECK (innovation_score BETWEEN 1 AND 5)",
+    );
+  }
 }
 
 function seedAdmin(conn: Database.Database) {
@@ -129,9 +153,19 @@ export type EvaluationRow = {
   idea_id: number;
   evaluator_id: number;
   feedback: string;
+  impact_score: number | null;
+  feasibility_score: number | null;
+  innovation_score: number | null;
   created_at: number;
 };
 
 export type EvaluationWithEvaluator = EvaluationRow & {
   evaluator_email: string;
+};
+
+export type IdeaWithSubmitterAndScores = IdeaWithSubmitter & {
+  avg_score: number | null;
+  impact_score: number | null;
+  feasibility_score: number | null;
+  innovation_score: number | null;
 };

@@ -5,10 +5,11 @@ import { ArrowLeft, CalendarDays, Download, UserRound } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { IdeaProgress } from "@/components/idea-progress";
+import { ScoreBreakdownGrid } from "@/components/score-breakdown";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDb, type IdeaWithSubmitter } from "@/lib/db";
+import { fetchIdeaById } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -31,13 +32,7 @@ export default async function IdeaDetailPage({
   const id = Number(rawId);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const idea = getDb()
-    .prepare(
-      `SELECT i.*, u.email AS submitter_email
-       FROM ideas i JOIN users u ON u.id = i.submitter_id
-       WHERE i.id = ?`,
-    )
-    .get(id) as IdeaWithSubmitter | undefined;
+  const idea = fetchIdeaById(id);
 
   if (!idea) notFound();
   if (user.role !== "admin" && idea.submitter_id !== user.id) notFound();
@@ -123,6 +118,19 @@ export default async function IdeaDetailPage({
           <p className="whitespace-pre-wrap text-sm leading-relaxed">
             {idea.description}
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Scores */}
+      <Card className="mt-6 p-8">
+        <CardContent className="p-0">
+          <ScoreBreakdownGrid
+            scores={{
+              impact: idea.impact_score,
+              feasibility: idea.feasibility_score,
+              innovation: idea.innovation_score,
+            }}
+          />
         </CardContent>
       </Card>
 

@@ -3,13 +3,14 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { IdeaProgress } from "@/components/idea-progress";
+import { ScoreBadge } from "@/components/score-badge";
 import { StatusBadge } from "@/components/status-badge";
 import {
   Card,
   CardContent,
   CardHeader,
 } from "@/components/ui/card";
-import type { IdeaWithSubmitter } from "@/lib/db";
+import type { IdeaWithSubmitterAndScores } from "@/lib/db";
 import { cn } from "@/lib/utils";
 
 function relativeDate(ms: number): string {
@@ -31,7 +32,7 @@ export function IdeaCard({
   href,
   featured = false,
 }: {
-  idea: IdeaWithSubmitter;
+  idea: IdeaWithSubmitterAndScores;
   showSubmitter?: boolean;
   href: string;
   featured?: boolean;
@@ -67,7 +68,10 @@ export function IdeaCard({
             >
               <Icon className="h-5 w-5" />
             </span>
-            <StatusBadge status={idea.status} />
+            <div className="flex items-center gap-2">
+              <ScoreBadge score={idea.avg_score} size="sm" />
+              <StatusBadge status={idea.status} />
+            </div>
           </div>
 
           <div className="mt-4 space-y-1">

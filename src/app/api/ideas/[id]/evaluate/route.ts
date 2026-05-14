@@ -15,6 +15,15 @@ function isEvaluateStatus(value: unknown): value is EvaluateStatus {
   return value === "under_review" || value === "accepted" || value === "rejected";
 }
 
+function isScore(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 5
+  );
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -40,8 +49,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { status, feedback } =
-    (body as { status?: unknown; feedback?: unknown }) ?? {};
+  const {
+    status,
+    feedback,
+    impact_score,
+    feasibility_score,
+    innovation_score,
+  } =
+    (body as {
+      status?: unknown;
+      feedback?: unknown;
+      impact_score?: unknown;
+      feasibility_score?: unknown;
+      innovation_score?: unknown;
+    }) ?? {};
 
   if (!isEvaluateStatus(status)) {
     return NextResponse.json(
@@ -58,6 +79,19 @@ export async function PATCH(
   if (feedback.length > 4000) {
     return NextResponse.json(
       { error: "feedback must be 4000 characters or fewer" },
+      { status: 400 },
+    );
+  }
+  if (
+    !isScore(impact_score) ||
+    !isScore(feasibility_score) ||
+    !isScore(innovation_score)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "impact_score, feasibility_score and innovation_score must each be integers from 1 to 5",
+      },
       { status: 400 },
     );
   }
@@ -79,9 +113,17 @@ export async function PATCH(
     ).run(dbStatus, now, ideaId);
 
     db.prepare(
-      `INSERT INTO evaluations (idea_id, evaluator_id, feedback, created_at)
-       VALUES (?, ?, ?, ?)`,
-    ).run(ideaId, user.id, feedback.trim(), now);
+      `INSERT INTO evaluations (idea_id, evaluator_id, feedback, impact_score, feasibility_score, innovation_score, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      ideaId,
+      user.id,
+      feedback.trim(),
+      impact_score,
+      feasibility_score,
+      innovation_score,
+      now,
+    );
   });
   tx();
 

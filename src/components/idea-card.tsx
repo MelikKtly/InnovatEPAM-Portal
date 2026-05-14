@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileText } from "lucide-react";
 
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
@@ -41,12 +42,14 @@ export function IdeaCard({
 }) {
   const meta = categoryMeta(idea.category);
   const Icon = meta.icon;
+  const isDraft = idea.is_draft === 1;
   const revealed = isIdentityRevealed(idea.status);
-  const blind = showSubmitter && !revealed;
+  const blind = showSubmitter && !revealed && !isDraft;
+  const linkHref = isDraft ? `/submit?draft=${idea.id}` : href;
 
   return (
     <Link
-      href={href}
+      href={linkHref}
       className={cn(
         "group relative block focus-visible:outline-none",
         featured && "sm:col-span-2 sm:row-span-2",
@@ -73,8 +76,17 @@ export function IdeaCard({
               <Icon className="h-5 w-5" />
             </span>
             <div className="flex items-center gap-2">
-              <ScoreBadge score={idea.avg_score} size="sm" />
-              <StatusBadge status={idea.status} />
+              {isDraft ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-300">
+                  <FileText className="h-3 w-3" />
+                  Draft
+                </span>
+              ) : (
+                <>
+                  <ScoreBadge score={idea.avg_score} size="sm" />
+                  <StatusBadge status={idea.status} />
+                </>
+              )}
             </div>
           </div>
 
@@ -100,7 +112,7 @@ export function IdeaCard({
             </p>
           ) : null}
 
-          <IdeaProgress status={idea.status} />
+          <IdeaProgress status={isDraft ? "submitted" : idea.status} />
 
           <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
@@ -118,10 +130,18 @@ export function IdeaCard({
                   </span>
                 )
               ) : (
-                <span>You</span>
+                <span>{isDraft ? "Draft · only you" : "You"}</span>
               )}
             </div>
-            <span>{relativeDate(idea.created_at)}</span>
+            <span>
+              {isDraft ? (
+                <span className="font-medium text-amber-600 dark:text-amber-300">
+                  Edit draft →
+                </span>
+              ) : (
+                relativeDate(idea.created_at)
+              )}
+            </span>
           </div>
         </CardContent>
       </Card>

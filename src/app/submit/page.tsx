@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
-import { Sparkles, UploadCloud, X } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { FileText, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,19 +20,81 @@ function humanSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
+type Mode = "create" | "edit-draft";
+
+type DraftPayload = {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  file_name: string | null;
+  file_path: string | null;
+  is_draft: 0 | 1;
+};
+
 export default function SubmitIdeaPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftIdParam = searchParams.get("draft");
+  const draftId = draftIdParam ? Number(draftIdParam) : null;
+
+  const [mode, setMode] = useState<Mode>(draftId ? "edit-draft" : "create");
+  const [loading, setLoading] = useState<boolean>(Boolean(draftId));
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>(IDEA_CATEGORIES[0]);
   const [file, setFile] = useState<File | null>(null);
+  const [existingFile, setExistingFile] = useState<{
+    name: string;
+    path: string;
+  } | null>(null);
+  const [removeExisting, setRemoveExisting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [busy, setBusy] = useState<null | "draft" | "submit">(null);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  useEffect(() => {
+    if (!draftId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/ideas/${draftId}`);
+        const data = (await res.json()) as {
+          idea?: DraftPayload;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok || !data.idea) {
+          setError(data.error ?? "Draft not found");
+          setMode("create");
+          return;
+        }
+        if (data.idea.is_draft !== 1) {
+          setError("This idea is no longer a draft and cannot be edited.");
+          setMode("create");
+          return;
+        }
+        setTitle(data.idea.title);
+        setDescription(data.idea.description);
+        setCategory(data.idea.category);
+        if (data.idea.file_path && data.idea.file_name) {
+          setExistingFile({
+            name: data.idea.file_name,
+            path: data.idea.file_path,
+          });
+        }
+      } catch {
+        if (!cancelled) setError("Failed to load draft");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftId]);
+
+  async function send(asDraft: boolean) {
     setError(null);
-
     if (file && file.size > MAX_FILE_BYTES) {
       setError("File exceeds 10 MB limit");
       return;
@@ -42,42 +104,86 @@ export default function SubmitIdeaPage() {
     form.set("title", title);
     form.set("description", description);
     form.set("category", category);
+    form.set("is_draft", asDraft ? "1" : "0");
     if (file) form.set("file", file);
+    if (mode === "edit-draft" && removeExisting && !file) {
+      form.set("remove_file", "1");
+    }
 
-    setSubmitting(true);
+    setBusy(asDraft ? "draft" : "submit");
     try {
-      const res = await fetch("/api/ideas", { method: "POST", body: form });
+      const url =
+        mode === "edit-draft" && draftId
+          ? `/api/ideas/${draftId}`
+          : "/api/ideas";
+      const method = mode === "edit-draft" ? "PATCH" : "POST";
+      const res = await fetch(url, { method, body: form });
       const data = (await res.json()) as {
         ok?: boolean;
         idea?: { id: number };
         error?: string;
       };
       if (!res.ok || !data.ok || !data.idea) {
-        setError(data.error ?? "Submission failed");
+        setError(data.error ?? "Save failed");
         return;
       }
-      router.replace(`/ideas/${data.idea.id}`);
+      router.replace(asDraft ? "/ideas" : `/ideas/${data.idea.id}`);
       router.refresh();
     } catch {
       setError("Network error");
     } finally {
-      setSubmitting(false);
+      setBusy(null);
     }
   }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void send(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-4 pb-16 sm:px-8">
+        <Card className="p-12 text-center text-sm text-muted-foreground">
+          Loading draft…
+        </Card>
+      </div>
+    );
+  }
+
+  const isEdit = mode === "edit-draft";
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-16 sm:px-8">
       <div className="mb-8 text-center sm:text-left">
         <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
-          <Sparkles className="h-3.5 w-3.5" />
-          New submission
+          {isEdit ? (
+            <>
+              <FileText className="h-3.5 w-3.5" />
+              Editing draft
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              New submission
+            </>
+          )}
         </span>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Share your <span className="text-gradient">next big idea</span>
+          {isEdit ? (
+            <>
+              Refine your <span className="text-gradient">draft</span>
+            </>
+          ) : (
+            <>
+              Share your <span className="text-gradient">next big idea</span>
+            </>
+          )}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Describe your idea, pick a category and (optionally) attach a
-          supporting document.
+          {isEdit
+            ? "Update your draft, or submit it for review when you're ready."
+            : "Describe your idea, pick a category and (optionally) attach a supporting document."}
         </p>
       </div>
 
@@ -135,7 +241,13 @@ export default function SubmitIdeaPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Attachment <span className="font-normal text-muted-foreground">(optional, max 10 MB)</span></Label>
+              <Label>
+                Attachment{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional, max 10 MB)
+                </span>
+              </Label>
+
               {file ? (
                 <div className="flex items-center justify-between rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
                   <div className="flex items-center gap-3">
@@ -146,6 +258,7 @@ export default function SubmitIdeaPage() {
                       <p className="text-sm font-medium">{file.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {humanSize(file.size)}
+                        {existingFile ? " · replaces existing" : ""}
                       </p>
                     </div>
                   </div>
@@ -155,6 +268,29 @@ export default function SubmitIdeaPage() {
                     size="icon"
                     onClick={() => setFile(null)}
                     aria-label="Remove file"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : existingFile && !removeExisting ? (
+                <div className="flex items-center justify-between rounded-xl border border-input bg-background/40 p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/15 text-primary">
+                      <FileText className="h-4 w-4" />
+                    </span>
+                    <div className="leading-tight">
+                      <p className="text-sm font-medium">{existingFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Already attached · upload a new file to replace
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setRemoveExisting(true)}
+                    aria-label="Remove attachment"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -189,15 +325,37 @@ export default function SubmitIdeaPage() {
               </p>
             ) : null}
 
-            <Button
-              type="submit"
-              variant="gradient"
-              size="lg"
-              disabled={submitting}
-              className="w-full"
-            >
-              {submitting ? "Submitting…" : "Submit idea"}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                disabled={busy !== null}
+                onClick={() => void send(true)}
+                className="sm:w-1/2"
+              >
+                <Save className="h-4 w-4" />
+                {busy === "draft"
+                  ? "Saving…"
+                  : isEdit
+                    ? "Update draft"
+                    : "Save as draft"}
+              </Button>
+              <Button
+                type="submit"
+                variant="gradient"
+                size="lg"
+                disabled={busy !== null}
+                className="sm:w-1/2"
+              >
+                <Send className="h-4 w-4" />
+                {busy === "submit"
+                  ? "Submitting…"
+                  : isEdit
+                    ? "Final submit"
+                    : "Submit idea"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

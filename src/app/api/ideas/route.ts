@@ -40,6 +40,7 @@ export async function POST(request: Request) {
   const description = (form.get("description") ?? "").toString().trim();
   const category = form.get("category");
   const file = form.get("file");
+  const isDraft = form.get("is_draft") === "1";
 
   if (title.length < 3 || title.length > 200) {
     return NextResponse.json(
@@ -81,10 +82,20 @@ export async function POST(request: Request) {
   const result = getDb()
     .prepare(
       `INSERT INTO ideas
-        (title, description, category, status, submitter_id, file_path, file_name, created_at, updated_at)
-       VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?, ?)`,
+        (title, description, category, status, submitter_id, file_path, file_name, is_draft, created_at, updated_at)
+       VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?, ?, ?)`,
     )
-    .run(title, description, category, user.id, filePath, fileName, now, now);
+    .run(
+      title,
+      description,
+      category,
+      user.id,
+      filePath,
+      fileName,
+      isDraft ? 1 : 0,
+      now,
+      now,
+    );
 
   const idea = getDb()
     .prepare("SELECT * FROM ideas WHERE id = ?")
@@ -106,6 +117,7 @@ export async function GET() {
           .prepare(
             `SELECT i.*, u.email AS submitter_email
              FROM ideas i JOIN users u ON u.id = i.submitter_id
+             WHERE i.is_draft = 0
              ORDER BY i.created_at DESC`,
           )
           .all() as (IdeaRow & { submitter_email: string })[])

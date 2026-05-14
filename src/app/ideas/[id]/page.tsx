@@ -36,6 +36,11 @@ export default async function IdeaDetailPage({
 
   if (!idea) notFound();
   if (user.role !== "admin" && idea.submitter_id !== user.id) notFound();
+  // Admins must never see drafts; redirect owners to the editor.
+  if (idea.is_draft === 1) {
+    if (user.role === "admin") notFound();
+    redirect(`/submit?draft=${idea.id}`);
+  }
 
   const meta = categoryMeta(idea.category);
   const Icon = meta.icon;

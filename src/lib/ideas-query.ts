@@ -26,7 +26,9 @@ const BASE_SELECT = `
 
 export function fetchAllIdeas(): IdeaWithSubmitterAndScores[] {
   return getDb()
-    .prepare(`${BASE_SELECT} ORDER BY i.created_at DESC`)
+    .prepare(
+      `${BASE_SELECT} WHERE i.is_draft = 0 ORDER BY i.created_at DESC`,
+    )
     .all() as IdeaWithSubmitterAndScores[];
 }
 

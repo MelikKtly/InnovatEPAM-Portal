@@ -50,6 +50,7 @@ export default async function AdminEvaluatePage({
   const db = getDb();
   const rawIdea = fetchIdeaById(ideaId);
   if (!rawIdea) notFound();
+  if (rawIdea.is_draft === 1) notFound();
   const idea = redactIdentity(rawIdea);
 
   const evaluations = db

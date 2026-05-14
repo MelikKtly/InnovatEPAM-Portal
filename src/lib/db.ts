@@ -56,6 +56,7 @@ function migrate(conn: Database.Database) {
       submitter_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       file_path     TEXT,
       file_name     TEXT,
+      is_draft      INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1)),
       created_at    INTEGER NOT NULL,
       updated_at    INTEGER NOT NULL
     );
@@ -96,6 +97,16 @@ function migrate(conn: Database.Database) {
   if (!have.has("innovation_score")) {
     conn.exec(
       "ALTER TABLE evaluations ADD COLUMN innovation_score INTEGER CHECK (innovation_score BETWEEN 1 AND 5)",
+    );
+  }
+
+  const ideaCols = conn
+    .prepare("PRAGMA table_info(ideas)")
+    .all() as { name: string }[];
+  const ideaHave = new Set(ideaCols.map((c) => c.name));
+  if (!ideaHave.has("is_draft")) {
+    conn.exec(
+      "ALTER TABLE ideas ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1))",
     );
   }
 }
@@ -142,6 +153,7 @@ export type IdeaRow = {
   submitter_id: number;
   file_path: string | null;
   file_name: string | null;
+  is_draft: 0 | 1;
   created_at: number;
   updated_at: number;
 };

@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { getDb, IDEA_CATEGORIES, type IdeaCategory, type IdeaRow } from "@/lib/db";
+import { buildExtraDetails, extraFieldFor } from "@/lib/extra-fields";
 import { getCurrentUser } from "@/lib/session";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -58,6 +59,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
 
+  const extraDef = extraFieldFor(category);
+  const extraValues: Record<string, string> = {};
+  if (extraDef) {
+    const raw = form.get(extraDef.key);
+    if (typeof raw === "string") extraValues[extraDef.key] = raw;
+  }
+  const extraDetails = buildExtraDetails(category, extraValues);
+
   let filePath: string | null = null;
   let fileName: string | null = null;
 
@@ -82,8 +91,8 @@ export async function POST(request: Request) {
   const result = getDb()
     .prepare(
       `INSERT INTO ideas
-        (title, description, category, status, submitter_id, file_path, file_name, is_draft, created_at, updated_at)
-       VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?, ?, ?)`,
+        (title, description, category, status, submitter_id, file_path, file_name, is_draft, extra_details, created_at, updated_at)
+       VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       title,
@@ -93,6 +102,7 @@ export async function POST(request: Request) {
       filePath,
       fileName,
       isDraft ? 1 : 0,
+      extraDetails,
       now,
       now,
     );

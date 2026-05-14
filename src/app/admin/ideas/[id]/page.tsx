@@ -9,6 +9,7 @@ import {
 
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
+import { ExtraDetailBlock } from "@/components/extra-detail-block";
 import { IdeaProgress } from "@/components/idea-progress";
 import { IdentityHiddenBadge } from "@/components/identity-hidden-badge";
 import { ScoreBadge } from "@/components/score-badge";
@@ -163,6 +164,11 @@ export default async function AdminEvaluatePage({
               </p>
             </div>
           ) : null}
+
+          <ExtraDetailBlock
+            category={idea.category}
+            raw={idea.extra_details}
+          />
 
           {idea.file_path ? (
             <Button asChild variant="outline">

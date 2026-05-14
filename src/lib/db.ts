@@ -57,6 +57,7 @@ function migrate(conn: Database.Database) {
       file_path     TEXT,
       file_name     TEXT,
       is_draft      INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1)),
+      extra_details TEXT,
       created_at    INTEGER NOT NULL,
       updated_at    INTEGER NOT NULL
     );
@@ -109,6 +110,9 @@ function migrate(conn: Database.Database) {
       "ALTER TABLE ideas ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1))",
     );
   }
+  if (!ideaHave.has("extra_details")) {
+    conn.exec("ALTER TABLE ideas ADD COLUMN extra_details TEXT");
+  }
 }
 
 function seedAdmin(conn: Database.Database) {
@@ -154,6 +158,7 @@ export type IdeaRow = {
   file_path: string | null;
   file_name: string | null;
   is_draft: 0 | 1;
+  extra_details: string | null;
   created_at: number;
   updated_at: number;
 };

@@ -10,6 +10,7 @@ import {
   type IdeaCategory,
   type IdeaRow,
 } from "@/lib/db";
+import { buildExtraDetails, extraFieldFor } from "@/lib/extra-fields";
 import { getCurrentUser } from "@/lib/session";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -129,6 +130,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
 
+  const extraDef = extraFieldFor(category);
+  const extraValues: Record<string, string> = {};
+  if (extraDef) {
+    const raw = form.get(extraDef.key);
+    if (typeof raw === "string") extraValues[extraDef.key] = raw;
+  }
+  const extraDetails = buildExtraDetails(category, extraValues);
+
   let filePath: string | null = existing.file_path;
   let fileName: string | null = existing.file_name;
 
@@ -156,7 +165,8 @@ export async function PATCH(
   db.prepare(
     `UPDATE ideas
         SET title = ?, description = ?, category = ?,
-            file_path = ?, file_name = ?, is_draft = ?, updated_at = ?
+            file_path = ?, file_name = ?, is_draft = ?,
+            extra_details = ?, updated_at = ?
       WHERE id = ?`,
   ).run(
     title,
@@ -165,6 +175,7 @@ export async function PATCH(
     filePath,
     fileName,
     isDraft ? 1 : 0,
+    extraDetails,
     now,
     id,
   );

@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { IDEA_CATEGORIES } from "@/lib/idea-constants";
+import { IDEA_CATEGORIES, type IdeaCategory } from "@/lib/idea-constants";
+import { extraFieldFor, parseExtraDetails } from "@/lib/extra-fields";
 import { cn } from "@/lib/utils";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -30,6 +31,7 @@ type DraftPayload = {
   file_name: string | null;
   file_path: string | null;
   is_draft: 0 | 1;
+  extra_details: string | null;
 };
 
 export default function SubmitIdeaPage() {
@@ -42,7 +44,8 @@ export default function SubmitIdeaPage() {
   const [loading, setLoading] = useState<boolean>(Boolean(draftId));
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string>(IDEA_CATEGORIES[0]);
+  const [category, setCategory] = useState<IdeaCategory>(IDEA_CATEGORIES[0]);
+  const [extras, setExtras] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const [existingFile, setExistingFile] = useState<{
     name: string;
@@ -75,7 +78,8 @@ export default function SubmitIdeaPage() {
         }
         setTitle(data.idea.title);
         setDescription(data.idea.description);
-        setCategory(data.idea.category);
+        setCategory(data.idea.category as IdeaCategory);
+        setExtras(parseExtraDetails(data.idea.extra_details));
         if (data.idea.file_path && data.idea.file_name) {
           setExistingFile({
             name: data.idea.file_name,
@@ -105,6 +109,10 @@ export default function SubmitIdeaPage() {
     form.set("description", description);
     form.set("category", category);
     form.set("is_draft", asDraft ? "1" : "0");
+    const extraDef = extraFieldFor(category);
+    if (extraDef) {
+      form.set(extraDef.key, (extras[extraDef.key] ?? "").trim());
+    }
     if (file) form.set("file", file);
     if (mode === "edit-draft" && removeExisting && !file) {
       form.set("remove_file", "1");
@@ -239,6 +247,45 @@ export default function SubmitIdeaPage() {
                 })}
               </div>
             </div>
+
+            {(() => {
+              const def = extraFieldFor(category);
+              if (!def) return null;
+              const value = extras[def.key] ?? "";
+              const setValue = (v: string) =>
+                setExtras((prev) => ({ ...prev, [def.key]: v }));
+              return (
+                <div className="space-y-2 rounded-2xl border border-primary/15 bg-primary/[0.04] p-4 backdrop-blur-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor={`extra-${def.key}`} className="text-sm">
+                      {def.label}
+                    </Label>
+                    <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                      {category}
+                    </span>
+                  </div>
+                  {def.hint ? (
+                    <p className="text-xs text-muted-foreground">{def.hint}</p>
+                  ) : null}
+                  {def.kind === "textarea" ? (
+                    <Textarea
+                      id={`extra-${def.key}`}
+                      rows={4}
+                      placeholder={def.placeholder}
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                    />
+                  ) : (
+                    <Input
+                      id={`extra-${def.key}`}
+                      placeholder={def.placeholder}
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                    />
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <Label>

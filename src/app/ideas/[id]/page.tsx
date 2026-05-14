@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, Download, UserRound } from "lucide-react";
 
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
+import { ExtraDetailBlock } from "@/components/extra-detail-block";
 import { IdeaProgress } from "@/components/idea-progress";
 import { ScoreBreakdownGrid } from "@/components/score-breakdown";
 import { StatusBadge } from "@/components/status-badge";
@@ -125,6 +126,16 @@ export default async function IdeaDetailPage({
           </p>
         </CardContent>
       </Card>
+
+      {/* Category-specific extra detail */}
+      {idea.extra_details ? (
+        <div className="mt-6">
+          <ExtraDetailBlock
+            category={idea.category}
+            raw={idea.extra_details}
+          />
+        </div>
+      ) : null}
 
       {/* Scores */}
       <Card className="mt-6 p-8">

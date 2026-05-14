@@ -1,26 +1,33 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Download,
+  MessageSquare,
+} from "lucide-react";
 
+import { Avatar } from "@/components/avatar";
+import { categoryMeta } from "@/components/category-meta";
+import { IdeaProgress } from "@/components/idea-progress";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   getDb,
   type EvaluationWithEvaluator,
   type IdeaWithSubmitter,
 } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 import { EvaluationForm } from "./evaluation-form";
 
 function formatDateTime(ms: number): string {
-  return new Date(ms).toLocaleString();
+  return new Date(ms).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default async function AdminEvaluatePage({
@@ -55,90 +62,154 @@ export default async function AdminEvaluatePage({
     )
     .all(ideaId) as EvaluationWithEvaluator[];
 
-  return (
-    <main className="mx-auto w-full max-w-3xl p-4 sm:p-8">
-      <div className="mb-4">
-        <Button asChild variant="link" className="px-0">
-          <Link href="/admin">← Back to dashboard</Link>
-        </Button>
-      </div>
+  const meta = categoryMeta(idea.category);
+  const Icon = meta.icon;
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-2xl">{idea.title}</CardTitle>
-              <CardDescription className="mt-1">
-                {idea.category} · submitted by {idea.submitter_email} on{" "}
-                {formatDateTime(idea.created_at)}
-              </CardDescription>
+  return (
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 sm:px-8">
+      <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
+        <Link href="/admin">
+          <ArrowLeft className="h-4 w-4" />
+          Back to dashboard
+        </Link>
+      </Button>
+
+      {/* Hero */}
+      <Card className="relative overflow-hidden p-8">
+        <div
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl opacity-70",
+            meta.halo,
+          )}
+        />
+        <div className="relative space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <span
+                className={cn(
+                  "grid h-14 w-14 place-items-center rounded-2xl text-white shadow-lg ring-1 ring-white/20",
+                  meta.tile,
+                )}
+              >
+                <Icon className="h-6 w-6" />
+              </span>
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {idea.category}
+                </p>
+                <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+                  {idea.title}
+                </h1>
+              </div>
             </div>
             <StatusBadge status={idea.status} />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Description
-            </h2>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {idea.description}
-            </p>
-          </section>
+
+          <IdeaProgress status={idea.status} />
+
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">
+              <Avatar email={idea.submitter_email} size="md" />
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Submitted by
+                </p>
+                <p className="font-medium">{idea.submitter_email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
+                <CalendarDays className="h-4 w-4" />
+              </span>
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Submitted
+                </p>
+                <p className="font-medium">{formatDateTime(idea.created_at)}</p>
+              </div>
+            </div>
+          </div>
+
+          {idea.description ? (
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Description
+              </p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {idea.description}
+              </p>
+            </div>
+          ) : null}
 
           {idea.file_path ? (
-            <section>
-              <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-                Attachment
-              </h2>
-              <Button asChild variant="outline">
-                <a href={idea.file_path} target="_blank" rel="noreferrer">
-                  Download {idea.file_name ?? "attachment"}
-                </a>
-              </Button>
-            </section>
+            <Button asChild variant="outline">
+              <a href={idea.file_path} target="_blank" rel="noreferrer">
+                <Download className="h-4 w-4" />
+                Download {idea.file_name ?? "attachment"}
+              </a>
+            </Button>
           ) : null}
-        </CardContent>
+        </div>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Evaluation</CardTitle>
-          <CardDescription>
-            Update the status and leave feedback for the submitter.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      {/* Evaluation form */}
+      <Card className="mt-6 p-8">
+        <CardContent className="p-0">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Evaluate this idea
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Update the status and leave feedback for the submitter.
+            </p>
+          </div>
           <EvaluationForm ideaId={idea.id} currentStatus={idea.status} />
         </CardContent>
       </Card>
 
+      {/* History */}
       {evaluations.length > 0 ? (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Previous evaluations</CardTitle>
-            <CardDescription>
-              Most recent feedback first.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {evaluations.map((ev) => (
-              <div
-                key={ev.id}
-                className="rounded-md border bg-muted/20 p-3 text-sm"
-              >
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>{ev.evaluator_email}</span>
-                  <span>{formatDateTime(ev.created_at)}</span>
-                </div>
-                <p className="whitespace-pre-wrap leading-relaxed">
-                  {ev.feedback}
+        <Card className="mt-6 p-8">
+          <CardContent className="space-y-4 p-0">
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                <MessageSquare className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Evaluation history
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Most recent feedback first
                 </p>
               </div>
-            ))}
+            </div>
+
+            <div className="space-y-3">
+              {evaluations.map((ev) => (
+                <div
+                  key={ev.id}
+                  className="rounded-xl border border-border/60 bg-muted/30 p-4 text-sm"
+                >
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Avatar email={ev.evaluator_email} size="sm" />
+                      <span className="font-medium text-foreground">
+                        {ev.evaluator_email}
+                      </span>
+                    </div>
+                    <span>{formatDateTime(ev.created_at)}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {ev.feedback}
+                  </p>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       ) : null}
-    </main>
+    </div>
   );
 }

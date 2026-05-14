@@ -4,19 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide transition-colors backdrop-blur",
   {
     variants: {
       variant: {
         default: "border-transparent bg-primary text-primary-foreground",
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         outline: "text-foreground",
-        blue: "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
-        yellow:
-          "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200",
-        green:
-          "border-transparent bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
-        red: "border-transparent bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
+        indigo:
+          "border-indigo-400/30 bg-indigo-500/15 text-indigo-700 shadow-[0_0_18px_-6px_rgba(99,102,241,0.55)] dark:text-indigo-200",
+        amber:
+          "border-amber-400/30 bg-amber-400/15 text-amber-800 shadow-[0_0_18px_-6px_rgba(251,191,36,0.6)] dark:text-amber-200",
+        emerald:
+          "border-emerald-400/30 bg-emerald-400/15 text-emerald-700 shadow-[0_0_22px_-6px_rgba(16,185,129,0.7)] dark:text-emerald-200",
+        rose: "border-rose-400/30 bg-rose-500/15 text-rose-700 shadow-[0_0_22px_-6px_rgba(244,63,94,0.65)] dark:text-rose-200",
       },
     },
     defaultVariants: { variant: "default" },

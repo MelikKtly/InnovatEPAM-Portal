@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { CheckCircle2, Clock, XCircle } from "lucide-react";
 
 import { Toast, type ToastMessage } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,33 @@ import type { IdeaStatus } from "@/lib/idea-constants";
 
 type EvaluateStatus = "under_review" | "accepted" | "rejected";
 
-const OPTIONS: { value: EvaluateStatus; label: string }[] = [
-  { value: "under_review", label: "Under review" },
-  { value: "accepted", label: "Accepted" },
-  { value: "rejected", label: "Rejected" },
+const OPTIONS: {
+  value: EvaluateStatus;
+  label: string;
+  icon: typeof Clock;
+  active: string;
+}[] = [
+  {
+    value: "under_review",
+    label: "Under review",
+    icon: Clock,
+    active:
+      "border-amber-400/60 bg-amber-400/15 text-amber-700 dark:text-amber-200",
+  },
+  {
+    value: "accepted",
+    label: "Accepted",
+    icon: CheckCircle2,
+    active:
+      "border-emerald-400/60 bg-emerald-400/15 text-emerald-700 dark:text-emerald-200",
+  },
+  {
+    value: "rejected",
+    label: "Rejected",
+    icon: XCircle,
+    active:
+      "border-rose-400/60 bg-rose-500/15 text-rose-700 dark:text-rose-200",
+  },
 ];
 
 function toEvaluateStatus(status: IdeaStatus): EvaluateStatus {
@@ -71,25 +95,33 @@ export function EvaluationForm({
   return (
     <>
       <Toast toast={toast} onDismiss={() => setToast(null)} />
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
-          <select
-            id="status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as EvaluateStatus)}
-            className={cn(
-              "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            )}
-          >
-            {OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <Label>Status</Label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {OPTIONS.map((o) => {
+              const Icon = o.icon;
+              const active = status === o.value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setStatus(o.value)}
+                  className={cn(
+                    "inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all",
+                    active
+                      ? o.active
+                      : "border-input bg-background/40 text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
         <div className="space-y-2">
           <Label htmlFor="feedback">Feedback</Label>
           <Textarea
@@ -102,7 +134,14 @@ export function EvaluationForm({
             placeholder="Share rationale for this decision…"
           />
         </div>
-        <Button type="submit" disabled={submitting}>
+
+        <Button
+          type="submit"
+          variant="gradient"
+          size="lg"
+          disabled={submitting}
+          className="w-full sm:w-auto"
+        >
           {submitting ? "Saving…" : "Save evaluation"}
         </Button>
       </form>

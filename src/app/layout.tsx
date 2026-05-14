@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-import { Navbar } from "@/components/navbar";
+import { AppChrome } from "@/components/app-chrome";
 import { getCurrentUser } from "@/lib/session";
 
 const geistSans = Geist({
@@ -33,8 +33,9 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Navbar user={user ? { email: user.email, role: user.role } : null} />
-        <div className="flex-1">{children}</div>
+        <AppChrome user={user ? { email: user.email, role: user.role } : null}>
+          {children}
+        </AppChrome>
       </body>
     </html>
   );

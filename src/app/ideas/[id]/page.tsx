@@ -1,20 +1,22 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ArrowLeft, CalendarDays, Download, UserRound } from "lucide-react";
 
+import { Avatar } from "@/components/avatar";
+import { categoryMeta } from "@/components/category-meta";
+import { IdeaProgress } from "@/components/idea-progress";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { getDb, type IdeaRow } from "@/lib/db";
+import { Card, CardContent } from "@/components/ui/card";
+import { getDb, type IdeaWithSubmitter } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 function formatDateTime(ms: number): string {
-  return new Date(ms).toLocaleString();
+  return new Date(ms).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default async function IdeaDetailPage({
@@ -35,74 +37,119 @@ export default async function IdeaDetailPage({
        FROM ideas i JOIN users u ON u.id = i.submitter_id
        WHERE i.id = ?`,
     )
-    .get(id) as (IdeaRow & { submitter_email: string }) | undefined;
+    .get(id) as IdeaWithSubmitter | undefined;
 
   if (!idea) notFound();
-  if (user.role !== "admin" && idea.submitter_id !== user.id) {
-    notFound();
-  }
+  if (user.role !== "admin" && idea.submitter_id !== user.id) notFound();
+
+  const meta = categoryMeta(idea.category);
+  const Icon = meta.icon;
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-4 sm:p-8">
-      <div className="mb-4">
-        <Button asChild variant="link" className="px-0">
-          <Link href="/ideas">← Back to ideas</Link>
-        </Button>
-      </div>
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 sm:px-8">
+      <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
+        <Link href="/ideas">
+          <ArrowLeft className="h-4 w-4" />
+          Back to ideas
+        </Link>
+      </Button>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-2xl">{idea.title}</CardTitle>
-              <CardDescription className="mt-1">
-                {idea.category}
-              </CardDescription>
+      {/* Hero card */}
+      <Card className="relative overflow-hidden p-8">
+        <div
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl opacity-70",
+            meta.halo,
+          )}
+        />
+
+        <div className="relative space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <span
+                className={cn(
+                  "grid h-14 w-14 place-items-center rounded-2xl text-white shadow-lg ring-1 ring-white/20",
+                  meta.tile,
+                )}
+              >
+                <Icon className="h-6 w-6" />
+              </span>
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {idea.category}
+                </p>
+                <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+                  {idea.title}
+                </h1>
+              </div>
             </div>
             <StatusBadge status={idea.status} />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-              Description
-            </h2>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {idea.description}
-            </p>
-          </section>
 
-          <section className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <p className="text-muted-foreground">Submitted by</p>
-              <p>{idea.submitter_email}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Submitted</p>
-              <p>{formatDateTime(idea.created_at)}</p>
-            </div>
-            {idea.updated_at !== idea.created_at ? (
-              <div>
-                <p className="text-muted-foreground">Last updated</p>
-                <p>{formatDateTime(idea.updated_at)}</p>
+          <IdeaProgress status={idea.status} />
+
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">
+              <Avatar email={idea.submitter_email} size="md" />
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Submitted by
+                </p>
+                <p className="font-medium">{idea.submitter_email}</p>
               </div>
-            ) : null}
-          </section>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
+                <CalendarDays className="h-4 w-4" />
+              </span>
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Submitted
+                </p>
+                <p className="font-medium">{formatDateTime(idea.created_at)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
-          {idea.file_path ? (
-            <section>
-              <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-                Attachment
-              </h2>
-              <Button asChild variant="outline">
-                <a href={idea.file_path} target="_blank" rel="noreferrer">
-                  Download {idea.file_name ?? "attachment"}
-                </a>
-              </Button>
-            </section>
-          ) : null}
+      {/* Description */}
+      <Card className="mt-6 p-8">
+        <CardContent className="space-y-3 p-0">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Description
+          </h2>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {idea.description}
+          </p>
         </CardContent>
       </Card>
-    </main>
+
+      {/* Attachment */}
+      {idea.file_path ? (
+        <Card className="mt-6 p-6">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-0">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
+                <UserRound className="h-5 w-5" />
+              </span>
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Attachment
+                </p>
+                <p className="font-medium">{idea.file_name ?? "Attachment"}</p>
+              </div>
+            </div>
+            <Button asChild variant="outline">
+              <a href={idea.file_path} target="_blank" rel="noreferrer">
+                <Download className="h-4 w-4" />
+                Download
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
   );
 }

@@ -3,16 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { UserPlus } from "lucide-react";
 
+import { AuthAside } from "@/components/auth-aside";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -53,22 +47,31 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create an account</CardTitle>
-          <CardDescription>
-            Register as a submitter to propose innovation ideas.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={onSubmit}>
-          <CardContent className="space-y-4">
+    <main className="flex min-h-screen">
+      <AuthAside tagline="Join the program — submit your first idea in under a minute." />
+
+      <section className="flex flex-1 items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-md">
+          <div className="mb-8 space-y-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+              <UserPlus className="h-3.5 w-3.5" /> Create your account
+            </span>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Start shaping <span className="text-gradient">what's next</span>.
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Register as a submitter to propose innovation ideas.
+            </p>
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
+                placeholder="you@epam.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -82,6 +85,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 required
                 minLength={6}
+                placeholder="At least 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -103,20 +107,29 @@ export default function RegisterPage() {
                 {error}
               </p>
             ) : null}
-          </CardContent>
-          <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={submitting}>
+
+            <Button
+              type="submit"
+              variant="gradient"
+              size="lg"
+              className="w-full"
+              disabled={submitting}
+            >
               {submitting ? "Creating account…" : "Create account"}
             </Button>
-            <p className="text-sm text-muted-foreground">
+
+            <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link className="underline" href="/login">
+              <Link
+                className="font-medium text-primary hover:underline"
+                href="/login"
+              >
                 Sign in
               </Link>
             </p>
-          </CardFooter>
-        </form>
-      </Card>
+          </form>
+        </div>
+      </section>
     </main>
   );
 }

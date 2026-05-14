@@ -28,12 +28,20 @@ export function Navbar({ user }: { user: NavbarUser | null }) {
           </Link>
           {user ? (
             <nav className="hidden gap-3 text-sm text-muted-foreground sm:flex">
-              <Link href="/ideas" className="hover:text-foreground">
-                Ideas
-              </Link>
-              <Link href="/submit" className="hover:text-foreground">
-                Submit
-              </Link>
+              {user.role === "admin" ? (
+                <Link href="/admin" className="hover:text-foreground">
+                  Admin Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link href="/submit" className="hover:text-foreground">
+                    Submit Idea
+                  </Link>
+                  <Link href="/ideas" className="hover:text-foreground">
+                    My Ideas
+                  </Link>
+                </>
+              )}
             </nav>
           ) : null}
         </div>
@@ -45,7 +53,7 @@ export function Navbar({ user }: { user: NavbarUser | null }) {
                 {user.role === "admin" ? " (admin)" : ""}
               </span>
               <Button variant="outline" size="sm" onClick={onSignOut}>
-                Sign out
+                Logout
               </Button>
             </>
           ) : (

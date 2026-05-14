@@ -54,6 +54,17 @@ function migrate(conn: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_ideas_submitter ON ideas(submitter_id);
     CREATE INDEX IF NOT EXISTS idx_ideas_created   ON ideas(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS evaluations (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      idea_id      INTEGER NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
+      evaluator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      feedback     TEXT NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_evaluations_idea
+      ON evaluations(idea_id, created_at DESC);
   `);
 }
 
@@ -123,3 +134,15 @@ export type IdeaRow = {
 };
 
 export type IdeaWithSubmitter = IdeaRow & { submitter_email: string };
+
+export type EvaluationRow = {
+  id: number;
+  idea_id: number;
+  evaluator_id: number;
+  feedback: string;
+  created_at: number;
+};
+
+export type EvaluationWithEvaluator = EvaluationRow & {
+  evaluator_email: string;
+};

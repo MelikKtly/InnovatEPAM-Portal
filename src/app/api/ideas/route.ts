@@ -1,15 +1,22 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
 
 import { NextResponse } from "next/server";
 
-import { getDb, IDEA_CATEGORIES, type IdeaCategory, type IdeaRow } from "@/lib/db";
+import {
+  getDb,
+  IDEA_CATEGORIES,
+  type IdeaCategory,
+  type IdeaRow,
+} from "@/lib/db";
+import { fetchAttachmentsByIdeaId } from "@/lib/attachments-query";
 import { buildExtraDetails, extraFieldFor } from "@/lib/extra-fields";
 import { getCurrentUser } from "@/lib/session";
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
+import {
+  MAX_FILE_BYTES,
+  UPLOAD_DIR,
+  persistAttachments,
+  pickFiles,
+} from "@/lib/uploads";
 
 function isCategory(value: unknown): value is IdeaCategory {
   return (
@@ -40,8 +47,10 @@ export async function POST(request: Request) {
   const title = (form.get("title") ?? "").toString().trim();
   const description = (form.get("description") ?? "").toString().trim();
   const category = form.get("category");
-  const file = form.get("file");
   const isDraft = form.get("is_draft") === "1";
+
+  // Accept both "files" (preferred, multi) and legacy "file" (single).
+  const files = [...pickFiles(form, "files"), ...pickFiles(form, "file")];
 
   if (title.length < 3 || title.length > 200) {
     return NextResponse.json(
@@ -67,51 +76,54 @@ export async function POST(request: Request) {
   }
   const extraDetails = buildExtraDetails(category, extraValues);
 
-  let filePath: string | null = null;
-  let fileName: string | null = null;
-
-  if (file && file instanceof File && file.size > 0) {
+  // Up-front size check so we reject before writing a row.
+  for (const file of files) {
     if (file.size > MAX_FILE_BYTES) {
       return NextResponse.json(
-        { error: "File exceeds 10 MB limit" },
+        { error: `"${file.name}" exceeds 10 MB limit` },
         { status: 413 },
       );
     }
+  }
+  if (files.length > 0) {
     await mkdir(UPLOAD_DIR, { recursive: true });
-    const ext = extname(file.name).slice(0, 16); // keep extension, defensive cap
-    const storedName = `${randomUUID()}${ext}`;
-    const absolute = join(UPLOAD_DIR, storedName);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(absolute, buffer);
-    filePath = `/uploads/${storedName}`;
-    fileName = file.name;
   }
 
   const now = Date.now();
   const result = getDb()
     .prepare(
       `INSERT INTO ideas
-        (title, description, category, status, submitter_id, file_path, file_name, is_draft, extra_details, created_at, updated_at)
-       VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?, ?, ?, ?)`,
+        (title, description, category, status, submitter_id, is_draft, extra_details, created_at, updated_at)
+       VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?, ?)`,
     )
     .run(
       title,
       description,
       category,
       user.id,
-      filePath,
-      fileName,
       isDraft ? 1 : 0,
       extraDetails,
       now,
       now,
     );
+  const ideaId = Number(result.lastInsertRowid);
+
+  const saved = await persistAttachments(ideaId, files);
+  if (!saved.ok) {
+    // Roll the idea back so the user can retry without orphans.
+    getDb().prepare("DELETE FROM ideas WHERE id = ?").run(ideaId);
+    return NextResponse.json({ error: saved.error }, { status: saved.status });
+  }
 
   const idea = getDb()
     .prepare("SELECT * FROM ideas WHERE id = ?")
-    .get(Number(result.lastInsertRowid)) as IdeaRow;
+    .get(ideaId) as IdeaRow;
+  const attachments = fetchAttachmentsByIdeaId(ideaId);
 
-  return NextResponse.json({ ok: true, idea }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, idea, attachments },
+    { status: 201 },
+  );
 }
 
 export async function GET() {

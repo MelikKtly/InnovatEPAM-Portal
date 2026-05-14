@@ -2,7 +2,16 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { FileText, Save, Send, Sparkles, UploadCloud, X } from "lucide-react";
+import {
+  FileText,
+  FileType,
+  ImageIcon,
+  Save,
+  Send,
+  Sparkles,
+  UploadCloud,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,15 +30,24 @@ function humanSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
+function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/");
+}
+
 type Mode = "create" | "edit-draft";
+
+type ExistingAttachment = {
+  id: number;
+  file_path: string;
+  file_name: string;
+  file_type: string;
+};
 
 type DraftPayload = {
   id: number;
   title: string;
   description: string;
   category: string;
-  file_name: string | null;
-  file_path: string | null;
   is_draft: 0 | 1;
   extra_details: string | null;
 };
@@ -46,12 +64,9 @@ export default function SubmitIdeaPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<IdeaCategory>(IDEA_CATEGORIES[0]);
   const [extras, setExtras] = useState<Record<string, string>>({});
-  const [file, setFile] = useState<File | null>(null);
-  const [existingFile, setExistingFile] = useState<{
-    name: string;
-    path: string;
-  } | null>(null);
-  const [removeExisting, setRemoveExisting] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [existing, setExisting] = useState<ExistingAttachment[]>([]);
+  const [removedExistingIds, setRemovedExistingIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "draft" | "submit">(null);
 
@@ -63,6 +78,7 @@ export default function SubmitIdeaPage() {
         const res = await fetch(`/api/ideas/${draftId}`);
         const data = (await res.json()) as {
           idea?: DraftPayload;
+          attachments?: ExistingAttachment[];
           error?: string;
         };
         if (cancelled) return;
@@ -80,12 +96,7 @@ export default function SubmitIdeaPage() {
         setDescription(data.idea.description);
         setCategory(data.idea.category as IdeaCategory);
         setExtras(parseExtraDetails(data.idea.extra_details));
-        if (data.idea.file_path && data.idea.file_name) {
-          setExistingFile({
-            name: data.idea.file_name,
-            path: data.idea.file_path,
-          });
-        }
+        setExisting(data.attachments ?? []);
       } catch {
         if (!cancelled) setError("Failed to load draft");
       } finally {
@@ -97,10 +108,35 @@ export default function SubmitIdeaPage() {
     };
   }, [draftId]);
 
+  function onPickFiles(picked: FileList | null) {
+    if (!picked || picked.length === 0) return;
+    setFiles((prev) => {
+      const next = [...prev];
+      for (const f of Array.from(picked)) {
+        // Avoid trivial duplicates (same name + size).
+        if (!next.some((x) => x.name === f.name && x.size === f.size)) {
+          next.push(f);
+        }
+      }
+      return next;
+    });
+  }
+
+  function removePendingFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function toggleRemoveExisting(id: number) {
+    setRemovedExistingIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
   async function send(asDraft: boolean) {
     setError(null);
-    if (file && file.size > MAX_FILE_BYTES) {
-      setError("File exceeds 10 MB limit");
+    const tooBig = files.find((f) => f.size > MAX_FILE_BYTES);
+    if (tooBig) {
+      setError(`"${tooBig.name}" exceeds 10 MB limit`);
       return;
     }
 
@@ -113,9 +149,9 @@ export default function SubmitIdeaPage() {
     if (extraDef) {
       form.set(extraDef.key, (extras[extraDef.key] ?? "").trim());
     }
-    if (file) form.set("file", file);
-    if (mode === "edit-draft" && removeExisting && !file) {
-      form.set("remove_file", "1");
+    for (const f of files) form.append("files", f);
+    if (mode === "edit-draft" && removedExistingIds.length > 0) {
+      form.set("remove_attachment_ids", removedExistingIds.join(","));
     }
 
     setBusy(asDraft ? "draft" : "submit");
@@ -289,80 +325,152 @@ export default function SubmitIdeaPage() {
 
             <div className="space-y-2">
               <Label>
-                Attachment{" "}
+                Attachments{" "}
                 <span className="font-normal text-muted-foreground">
-                  (optional, max 10 MB)
+                  (optional, up to 10 MB each · multiple files supported)
                 </span>
               </Label>
 
-              {file ? (
-                <div className="flex items-center justify-between rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/15 text-primary">
-                      <UploadCloud className="h-4 w-4" />
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {humanSize(file.size)}
-                        {existingFile ? " · replaces existing" : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setFile(null)}
-                    aria-label="Remove file"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : existingFile && !removeExisting ? (
-                <div className="flex items-center justify-between rounded-xl border border-input bg-background/40 p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/15 text-primary">
-                      <FileText className="h-4 w-4" />
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-sm font-medium">{existingFile.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Already attached · upload a new file to replace
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setRemoveExisting(true)}
-                    aria-label="Remove attachment"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <label
-                  htmlFor="file"
-                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-input bg-background/40 p-8 text-center transition-colors hover:border-primary/50 hover:bg-accent"
-                >
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <UploadCloud className="h-5 w-5" />
-                  </span>
-                  <span className="text-sm font-medium">
-                    Drop a file here, or click to browse
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    PDF, DOCX, images — up to 10 MB
-                  </span>
-                </label>
-              )}
+              {existing.length > 0 ? (
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {existing.map((att) => {
+                    const removed = removedExistingIds.includes(att.id);
+                    const image = att.file_type.startsWith("image/");
+                    return (
+                      <li
+                        key={att.id}
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl border p-2.5 transition-all",
+                          removed
+                            ? "border-dashed border-destructive/40 bg-destructive/[0.04] opacity-60"
+                            : "border-input/60 bg-background/40",
+                        )}
+                      >
+                        {image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={att.file_path}
+                            alt={att.file_name}
+                            className="h-11 w-11 flex-shrink-0 rounded-lg object-cover ring-1 ring-white/10"
+                          />
+                        ) : (
+                          <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                            {att.file_type === "application/pdf" ? (
+                              <FileText className="h-5 w-5" />
+                            ) : (
+                              <FileType className="h-5 w-5" />
+                            )}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1 leading-tight">
+                          <p
+                            className={cn(
+                              "truncate text-sm font-medium",
+                              removed && "line-through",
+                            )}
+                            title={att.file_name}
+                          >
+                            {att.file_name}
+                          </p>
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                            {removed ? "Will be removed" : "Already attached"}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleRemoveExisting(att.id)}
+                        >
+                          {removed ? "Keep" : "Remove"}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+
+              {files.length > 0 ? (
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {files.map((f, i) => {
+                    const image = isImageFile(f);
+                    const url = image ? URL.createObjectURL(f) : null;
+                    return (
+                      <li
+                        key={`${f.name}-${i}`}
+                        className="flex items-center gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-2.5"
+                      >
+                        {url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={url}
+                            alt={f.name}
+                            className="h-11 w-11 flex-shrink-0 rounded-lg object-cover ring-1 ring-white/10"
+                            onLoad={() => URL.revokeObjectURL(url)}
+                          />
+                        ) : (
+                          <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
+                            {f.type === "application/pdf" ? (
+                              <FileText className="h-5 w-5" />
+                            ) : f.type.startsWith("image/") ? (
+                              <ImageIcon className="h-5 w-5" />
+                            ) : (
+                              <FileType className="h-5 w-5" />
+                            )}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1 leading-tight">
+                          <p
+                            className="truncate text-sm font-medium"
+                            title={f.name}
+                          >
+                            {f.name}
+                          </p>
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                            {humanSize(f.size)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removePendingFile(i)}
+                          aria-label={`Remove ${f.name}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+
+              <label
+                htmlFor="files"
+                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-input bg-background/40 p-8 text-center transition-colors hover:border-primary/50 hover:bg-accent"
+              >
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <UploadCloud className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-medium">
+                  {files.length > 0 || existing.length > 0
+                    ? "Add more files"
+                    : "Drop files here, or click to browse"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Images, PDF, DOCX, etc. — up to 10 MB each
+                </span>
+              </label>
               <Input
-                id="file"
+                id="files"
                 type="file"
+                multiple
                 className="sr-only"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  onPickFiles(e.target.files);
+                  // Reset so picking the same file again still fires onChange.
+                  e.target.value = "";
+                }}
               />
             </div>
 

@@ -3,10 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
-  Download,
   MessageSquare,
 } from "lucide-react";
 
+import { AttachmentGallery } from "@/components/attachment-gallery";
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { ExtraDetailBlock } from "@/components/extra-detail-block";
@@ -22,6 +22,7 @@ import {
   type EvaluationWithEvaluator,
 } from "@/lib/db";
 import { isIdentityRevealed, redactIdentity } from "@/lib/blind-review";
+import { fetchAttachmentsByIdeaId } from "@/lib/attachments-query";
 import { fetchIdeaById } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ export default async function AdminEvaluatePage({
   if (!rawIdea) notFound();
   if (rawIdea.is_draft === 1) notFound();
   const idea = redactIdentity(rawIdea);
+  const attachments = fetchAttachmentsByIdeaId(ideaId);
 
   const evaluations = db
     .prepare(
@@ -170,14 +172,7 @@ export default async function AdminEvaluatePage({
             raw={idea.extra_details}
           />
 
-          {idea.file_path ? (
-            <Button asChild variant="outline">
-              <a href={idea.file_path} target="_blank" rel="noreferrer">
-                <Download className="h-4 w-4" />
-                Download {idea.file_name ?? "attachment"}
-              </a>
-            </Button>
-          ) : null}
+          <AttachmentGallery attachments={attachments} />
         </div>
       </Card>
 

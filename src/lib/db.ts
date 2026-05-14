@@ -78,6 +78,18 @@ function migrate(conn: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_evaluations_idea
       ON evaluations(idea_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS attachments (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      idea_id    INTEGER NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
+      file_path  TEXT NOT NULL,
+      file_name  TEXT NOT NULL,
+      file_type  TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_attachments_idea
+      ON attachments(idea_id, created_at);
   `);
 
   // Idempotent column additions for existing databases.
@@ -112,6 +124,80 @@ function migrate(conn: Database.Database) {
   }
   if (!ideaHave.has("extra_details")) {
     conn.exec("ALTER TABLE ideas ADD COLUMN extra_details TEXT");
+  }
+
+  // Backfill: any legacy single-file attachment stored on ideas should appear
+  // in the attachments table exactly once. Safe to run on every boot because
+  // we key on (idea_id, file_path).
+  const legacyRows = conn
+    .prepare(
+      `SELECT id, file_path, file_name, created_at
+         FROM ideas
+        WHERE file_path IS NOT NULL AND file_name IS NOT NULL`,
+    )
+    .all() as {
+      id: number;
+      file_path: string;
+      file_name: string;
+      created_at: number;
+    }[];
+  if (legacyRows.length > 0) {
+    const exists = conn.prepare(
+      "SELECT id FROM attachments WHERE idea_id = ? AND file_path = ?",
+    );
+    const insert = conn.prepare(
+      `INSERT INTO attachments (idea_id, file_path, file_name, file_type, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+    );
+    const tx = conn.transaction(() => {
+      for (const row of legacyRows) {
+        if (exists.get(row.id, row.file_path)) continue;
+        const ext = row.file_name.includes(".")
+          ? row.file_name.slice(row.file_name.lastIndexOf(".") + 1).toLowerCase()
+          : "";
+        const fileType = guessMimeFromExt(ext);
+        insert.run(row.id, row.file_path, row.file_name, fileType, row.created_at);
+      }
+    });
+    tx();
+  }
+}
+
+function guessMimeFromExt(ext: string): string {
+  switch (ext) {
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "svg":
+      return "image/svg+xml";
+    case "pdf":
+      return "application/pdf";
+    case "doc":
+      return "application/msword";
+    case "docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case "xls":
+      return "application/vnd.ms-excel";
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    case "ppt":
+      return "application/vnd.ms-powerpoint";
+    case "pptx":
+      return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "txt":
+      return "text/plain";
+    case "csv":
+      return "text/csv";
+    case "zip":
+      return "application/zip";
+    default:
+      return "application/octet-stream";
   }
 }
 
@@ -185,4 +271,13 @@ export type IdeaWithSubmitterAndScores = IdeaWithSubmitter & {
   impact_score: number | null;
   feasibility_score: number | null;
   innovation_score: number | null;
+};
+
+export type AttachmentRow = {
+  id: number;
+  idea_id: number;
+  file_path: string;
+  file_name: string;
+  file_type: string;
+  created_at: number;
 };

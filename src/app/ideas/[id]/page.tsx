@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarDays, Download, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarDays } from "lucide-react";
 
+import { AttachmentGallery } from "@/components/attachment-gallery";
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { ExtraDetailBlock } from "@/components/extra-detail-block";
@@ -10,6 +11,7 @@ import { ScoreBreakdownGrid } from "@/components/score-breakdown";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { fetchAttachmentsByIdeaId } from "@/lib/attachments-query";
 import { fetchIdeaById } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,8 @@ export default async function IdeaDetailPage({
     if (user.role === "admin") notFound();
     redirect(`/submit?draft=${idea.id}`);
   }
+
+  const attachments = fetchAttachmentsByIdeaId(id);
 
   const meta = categoryMeta(idea.category);
   const Icon = meta.icon;
@@ -150,27 +154,11 @@ export default async function IdeaDetailPage({
         </CardContent>
       </Card>
 
-      {/* Attachment */}
-      {idea.file_path ? (
+      {/* Attachments */}
+      {attachments.length > 0 ? (
         <Card className="mt-6 p-6">
-          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-0">
-            <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
-                <UserRound className="h-5 w-5" />
-              </span>
-              <div className="leading-tight">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Attachment
-                </p>
-                <p className="font-medium">{idea.file_name ?? "Attachment"}</p>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <a href={idea.file_path} target="_blank" rel="noreferrer">
-                <Download className="h-4 w-4" />
-                Download
-              </a>
-            </Button>
+          <CardContent className="p-0">
+            <AttachmentGallery attachments={attachments} />
           </CardContent>
         </Card>
       ) : null}

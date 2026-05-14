@@ -1,7 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
-import { randomUUID } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
 import {
@@ -10,11 +6,10 @@ import {
   type IdeaCategory,
   type IdeaRow,
 } from "@/lib/db";
+import { fetchAttachmentsByIdeaId } from "@/lib/attachments-query";
 import { buildExtraDetails, extraFieldFor } from "@/lib/extra-fields";
 import { getCurrentUser } from "@/lib/session";
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
+import { parseRemovalIds, persistAttachments, pickFiles } from "@/lib/uploads";
 
 function isCategory(value: unknown): value is IdeaCategory {
   return (
@@ -57,13 +52,15 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  return NextResponse.json({ idea: row });
+  const attachments = fetchAttachmentsByIdeaId(id);
+  return NextResponse.json({ idea: row, attachments });
 }
 
 /**
  * Owner-only edit. Used to update a draft, or to "finalise" a draft into a
  * submission (when `is_draft=0` is sent). Submitted (non-draft) ideas can no
- * longer be edited.
+ * longer be edited. Supports adding new files (`files`) and removing existing
+ * attachments by id (`remove_attachment_ids`).
  */
 export async function PATCH(
   request: Request,
@@ -110,9 +107,9 @@ export async function PATCH(
   const title = (form.get("title") ?? "").toString().trim();
   const description = (form.get("description") ?? "").toString().trim();
   const category = form.get("category");
-  const file = form.get("file");
-  const remove = form.get("remove_file") === "1";
   const isDraft = form.get("is_draft") === "1";
+  const newFiles = [...pickFiles(form, "files"), ...pickFiles(form, "file")];
+  const removeIds = parseRemovalIds(form);
 
   if (title.length < 3 || title.length > 200) {
     return NextResponse.json(
@@ -138,48 +135,33 @@ export async function PATCH(
   }
   const extraDetails = buildExtraDetails(category, extraValues);
 
-  let filePath: string | null = existing.file_path;
-  let fileName: string | null = existing.file_name;
-
-  if (file && file instanceof File && file.size > 0) {
-    if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json(
-        { error: "File exceeds 10 MB limit" },
-        { status: 413 },
-      );
-    }
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const ext = extname(file.name).slice(0, 16);
-    const storedName = `${randomUUID()}${ext}`;
-    const absolute = join(UPLOAD_DIR, storedName);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(absolute, buffer);
-    filePath = `/uploads/${storedName}`;
-    fileName = file.name;
-  } else if (remove) {
-    filePath = null;
-    fileName = null;
-  }
-
+  // Update the idea row. The legacy file_path/file_name columns are cleared
+  // because the attachments table is now the single source of truth.
   const now = Date.now();
   db.prepare(
     `UPDATE ideas
         SET title = ?, description = ?, category = ?,
-            file_path = ?, file_name = ?, is_draft = ?,
-            extra_details = ?, updated_at = ?
+            file_path = NULL, file_name = NULL,
+            is_draft = ?, extra_details = ?, updated_at = ?
       WHERE id = ?`,
-  ).run(
-    title,
-    description,
-    category,
-    filePath,
-    fileName,
-    isDraft ? 1 : 0,
-    extraDetails,
-    now,
-    id,
-  );
+  ).run(title, description, category, isDraft ? 1 : 0, extraDetails, now, id);
 
-  const idea = db.prepare("SELECT * FROM ideas WHERE id = ?").get(id) as IdeaRow;
-  return NextResponse.json({ ok: true, idea });
+  if (removeIds.length > 0) {
+    const placeholders = removeIds.map(() => "?").join(",");
+    db.prepare(
+      `DELETE FROM attachments
+        WHERE idea_id = ? AND id IN (${placeholders})`,
+    ).run(id, ...removeIds);
+  }
+
+  const saved = await persistAttachments(id, newFiles);
+  if (!saved.ok) {
+    return NextResponse.json({ error: saved.error }, { status: saved.status });
+  }
+
+  const idea = db
+    .prepare("SELECT * FROM ideas WHERE id = ?")
+    .get(id) as IdeaRow;
+  const attachments = fetchAttachmentsByIdeaId(id);
+  return NextResponse.json({ ok: true, idea, attachments });
 }

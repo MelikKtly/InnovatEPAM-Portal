@@ -15,6 +15,8 @@
 - Q: Should registration be restricted to EPAM email domains? → A: Yes — only `@epam.com` and a configurable allow-list of EPAM subdomains may register.
 - Q: Who can see ideas in which statuses? → A: Non-admins see submitted / under review / accepted ideas; rejected ideas are hidden from everyone except their own submitter and admins.
 - Q: What is the session lifetime? → A: 7-day rolling (each request refreshes expiry) with a 30-day absolute cap.
+- Q: What is the password policy? → A: Minimum 10 characters, must include at least one letter and one digit; no other character-class rules.
+- Q: Can a decided idea be re-opened? → A: Yes — an Admin may move an accepted or rejected idea back to under review; any subsequent accept/reject requires new feedback, and the latest decision is what is displayed.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -89,7 +91,7 @@ A new EPAM employee registers an account with email and password, signs in, and 
 
 **Authentication & Authorization**
 
-- **FR-001**: System MUST allow visitors to register an account using an email address and a password, accepting only emails whose domain matches `epam.com` or an entry on a configurable allow-list of EPAM subdomains; all other email domains MUST be rejected with a clear message.
+- **FR-001**: System MUST allow visitors to register an account using an email address and a password, accepting only emails whose domain matches `epam.com` or an entry on a configurable allow-list of EPAM subdomains; all other email domains MUST be rejected with a clear message. The password MUST be at least 10 characters long and contain at least one letter and at least one digit; registrations that do not meet this rule MUST be rejected with a message that identifies the unmet requirement.
 - **FR-002**: System MUST reject registration when the email is already associated with an existing account.
 - **FR-003**: System MUST authenticate users by email and password and maintain a signed-in session that remains valid for 7 days from the most recent authenticated request (sliding/rolling expiry) and MUST be terminated at the latest 30 days after sign-in regardless of activity (absolute cap).
 - **FR-004**: System MUST provide a sign-out action that ends the current session.
@@ -119,7 +121,9 @@ A new EPAM employee registers an account with email and password, signs in, and 
 - **FR-019**: System MUST track each idea's status as one of: submitted, under review, accepted, rejected.
 - **FR-020**: System MUST allow an Admin/Evaluator to move an idea from "submitted" to "under review".
 - **FR-021**: System MUST allow an Admin/Evaluator to move an idea from "submitted" or "under review" to "accepted" or "rejected".
-- **FR-022**: System MUST require non-empty written feedback when an Admin/Evaluator records an "accepted" or "rejected" decision, and MUST persist that feedback with the idea.
+- **FR-021a**: System MUST allow an Admin/Evaluator to move an idea from "accepted" or "rejected" back to "under review" (re-opening). Re-opening MUST NOT erase the prior decision feedback from the audit/visible history, but the displayed current status MUST become "under review" with no current decision feedback until a new decision is recorded.
+- **FR-021b**: System MUST NOT allow an Admin/Evaluator to flip directly between "accepted" and "rejected"; a decided idea MUST first be re-opened to "under review" before a new opposite decision is recorded.
+- **FR-022**: System MUST require non-empty written feedback each time an Admin/Evaluator records an "accepted" or "rejected" decision (including the first decision and any re-decision after re-opening), and MUST persist that feedback with the idea as the current decision feedback.
 - **FR-023**: System MUST show the current status and stored evaluator feedback on the idea detail view to every viewer permitted to see that idea under FR-016 / FR-018.
 - **FR-024**: System MUST provide an admin dashboard, restricted to Admin/Evaluator accounts, that lists every idea with status, with the ability to filter or group by status and to open each idea for action.
 
@@ -133,7 +137,7 @@ A new EPAM employee registers an account with email and password, signs in, and 
 - **User**: An EPAM employee account. Attributes: unique identifier, email (unique), password credential, role (Submitter or Admin/Evaluator), creation timestamp. Relationships: a User authors zero or more Ideas; an Admin/Evaluator User records zero or more Evaluation decisions.
 - **Idea**: A submitted innovation proposal. Attributes: unique identifier, title, description, category (one of the four fixed values), current status (submitted | under review | accepted | rejected), submission timestamp, last-updated timestamp. Relationships: belongs to one submitting User; has at most one Attachment; has at most one current Evaluation outcome.
 - **Attachment**: A single file associated with an Idea. Attributes: original filename, content type, size, stored location reference. Relationships: belongs to exactly one Idea.
-- **Evaluation**: The decision an Admin/Evaluator records on an Idea. Attributes: decision (accepted | rejected), feedback text, decision timestamp, decider identity. Relationships: belongs to exactly one Idea; references the deciding Admin/Evaluator User. (Status transitions to "under review" do not require an Evaluation record but MUST be tracked as a status change.)
+- **Evaluation**: The decision an Admin/Evaluator records on an Idea. Attributes: decision (accepted | rejected), feedback text, decision timestamp, decider identity. Relationships: belongs to exactly one Idea; references the deciding Admin/Evaluator User. (Status transitions to "under review" do not require an Evaluation record but MUST be tracked as a status change. When an Idea is re-opened from a decided status to "under review", the prior Evaluation is preserved as historical, and the Idea's current decision feedback is cleared until a new Evaluation is recorded.)
 
 ## Success Criteria *(mandatory)*
 
@@ -150,7 +154,7 @@ A new EPAM employee registers an account with email and password, signs in, and 
 ## Assumptions
 
 - The portal is for EPAM employees; the registration form does not need third-party identity providers (SSO) in this release. Eligibility is enforced by restricting accepted email domains to `epam.com` and a configurable allow-list of EPAM subdomains (see FR-001).
-- Password rules follow common modern practice (minimum length around 8 characters with at least one letter and one digit); the exact policy will be finalized during planning but is not part of feature scope.
+- Password rules are: minimum 10 characters, must contain at least one letter and at least one digit (no other character-class rules). This is enforced by FR-001.
 - Password reset / "forgot password" is explicitly out of scope for this release; a forgotten password is handled by an Admin re-issuing credentials.
 - A single seeded Admin/Evaluator account will exist at launch to bootstrap evaluations until other accounts are promoted.
 - The maximum attachment size is 10 MB per file; this is a sensible default and may be tightened or relaxed during planning without changing the feature's intent.

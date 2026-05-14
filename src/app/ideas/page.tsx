@@ -6,6 +6,7 @@ import { IdeaCard } from "@/components/idea-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { type IdeaStatus } from "@/lib/db";
+import { redactIdentity } from "@/lib/blind-review";
 import { fetchAllIdeas, fetchIdeasForSubmitter } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,9 @@ export default async function IdeasListPage() {
   if (!user) redirect("/login?next=/ideas");
 
   const ideas =
-    user.role === "admin" ? fetchAllIdeas() : fetchIdeasForSubmitter(user.id);;
+    user.role === "admin"
+      ? fetchAllIdeas().map(redactIdentity)
+      : fetchIdeasForSubmitter(user.id);
 
   const counts = statCounts(ideas);
 

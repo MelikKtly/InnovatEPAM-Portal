@@ -10,6 +10,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { IdeaProgress } from "@/components/idea-progress";
+import { IdentityHiddenBadge } from "@/components/identity-hidden-badge";
 import { ScoreBadge } from "@/components/score-badge";
 import { ScoreBreakdownGrid } from "@/components/score-breakdown";
 import { StatusBadge } from "@/components/status-badge";
@@ -19,6 +20,7 @@ import {
   getDb,
   type EvaluationWithEvaluator,
 } from "@/lib/db";
+import { isIdentityRevealed, redactIdentity } from "@/lib/blind-review";
 import { fetchIdeaById } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -46,8 +48,9 @@ export default async function AdminEvaluatePage({
   if (!Number.isInteger(ideaId) || ideaId <= 0) notFound();
 
   const db = getDb();
-  const idea = fetchIdeaById(ideaId);
-  if (!idea) notFound();
+  const rawIdea = fetchIdeaById(ideaId);
+  if (!rawIdea) notFound();
+  const idea = redactIdentity(rawIdea);
 
   const evaluations = db
     .prepare(
@@ -60,6 +63,7 @@ export default async function AdminEvaluatePage({
 
   const meta = categoryMeta(idea.category);
   const Icon = meta.icon;
+  const revealed = isIdentityRevealed(idea.status);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 sm:px-8">
@@ -114,12 +118,25 @@ export default async function AdminEvaluatePage({
 
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">
-              <Avatar email={idea.submitter_email} size="md" />
+              <Avatar
+                email={idea.submitter_email}
+                size="md"
+                anonymous={!revealed}
+              />
               <div className="leading-tight">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">
                   Submitted by
                 </p>
-                <p className="font-medium">{idea.submitter_email}</p>
+                {revealed ? (
+                  <p className="font-medium">{idea.submitter_email}</p>
+                ) : (
+                  <div className="mt-1 flex flex-col gap-1">
+                    <IdentityHiddenBadge />
+                    <p className="text-[11px] text-muted-foreground">
+                      Revealed after final decision
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl bg-muted/40 p-3">

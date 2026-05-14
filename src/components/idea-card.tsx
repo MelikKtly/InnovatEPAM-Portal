@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
 import { IdeaProgress } from "@/components/idea-progress";
+import { IdentityHiddenBadge } from "@/components/identity-hidden-badge";
 import { ScoreBadge } from "@/components/score-badge";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -11,6 +12,7 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import type { IdeaWithSubmitterAndScores } from "@/lib/db";
+import { isIdentityRevealed } from "@/lib/blind-review";
 import { cn } from "@/lib/utils";
 
 function relativeDate(ms: number): string {
@@ -39,6 +41,8 @@ export function IdeaCard({
 }) {
   const meta = categoryMeta(idea.category);
   const Icon = meta.icon;
+  const revealed = isIdentityRevealed(idea.status);
+  const blind = showSubmitter && !revealed;
 
   return (
     <Link
@@ -100,11 +104,19 @@ export function IdeaCard({
 
           <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Avatar email={idea.submitter_email} size="sm" />
+              <Avatar
+                email={idea.submitter_email}
+                size="sm"
+                anonymous={blind}
+              />
               {showSubmitter ? (
-                <span className="font-medium text-foreground">
-                  {idea.submitter_email}
-                </span>
+                blind ? (
+                  <IdentityHiddenBadge size="sm" />
+                ) : (
+                  <span className="font-medium text-foreground">
+                    {idea.submitter_email}
+                  </span>
+                )
               ) : (
                 <span>You</span>
               )}

@@ -11,11 +11,13 @@ import {
 
 import { Avatar } from "@/components/avatar";
 import { categoryMeta } from "@/components/category-meta";
+import { IdentityHiddenBadge } from "@/components/identity-hidden-badge";
 import { ScoreBadge } from "@/components/score-badge";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { type IdeaStatus } from "@/lib/db";
+import { isIdentityRevealed, redactIdentity } from "@/lib/blind-review";
 import { fetchAllIdeas } from "@/lib/ideas-query";
 import { getCurrentUser } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -33,7 +35,7 @@ export default async function AdminDashboardPage() {
   if (!user) redirect("/login?next=/admin");
   if (user.role !== "admin") redirect("/ideas");
 
-  const ideas = fetchAllIdeas();
+  const ideas = fetchAllIdeas().map(redactIdentity);
 
   const counts: Record<IdeaStatus, number> = {
     submitted: 0,
@@ -152,6 +154,7 @@ export default async function AdminDashboardPage() {
                 {ideas.map((idea) => {
                   const meta = categoryMeta(idea.category);
                   const Icon = meta.icon;
+                  const revealed = isIdentityRevealed(idea.status);
                   return (
                     <tr
                       key={idea.id}
@@ -175,10 +178,18 @@ export default async function AdminDashboardPage() {
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
-                          <Avatar email={idea.submitter_email} size="sm" />
-                          <span className="text-xs text-muted-foreground">
-                            {idea.submitter_email}
-                          </span>
+                          <Avatar
+                            email={idea.submitter_email}
+                            size="sm"
+                            anonymous={!revealed}
+                          />
+                          {revealed ? (
+                            <span className="text-xs text-muted-foreground">
+                              {idea.submitter_email}
+                            </span>
+                          ) : (
+                            <IdentityHiddenBadge size="sm" />
+                          )}
                         </div>
                       </td>
                       <td className="px-5 py-3">

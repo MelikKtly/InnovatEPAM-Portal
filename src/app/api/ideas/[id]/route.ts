@@ -1,0 +1,167 @@
+import { NextResponse } from "next/server";
+
+import {
+  getDb,
+  IDEA_CATEGORIES,
+  type IdeaCategory,
+  type IdeaRow,
+} from "@/lib/db";
+import { fetchAttachmentsByIdeaId } from "@/lib/attachments-query";
+import { buildExtraDetails, extraFieldFor } from "@/lib/extra-fields";
+import { getCurrentUser } from "@/lib/session";
+import { parseRemovalIds, persistAttachments, pickFiles } from "@/lib/uploads";
+
+function isCategory(value: unknown): value is IdeaCategory {
+  return (
+    typeof value === "string" &&
+    (IDEA_CATEGORIES as readonly string[]).includes(value)
+  );
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: rawId } = await params;
+  const id = Number(rawId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const row = getDb()
+    .prepare(
+      `SELECT i.*, u.email AS submitter_email
+       FROM ideas i JOIN users u ON u.id = i.submitter_id
+       WHERE i.id = ?`,
+    )
+    .get(id) as (IdeaRow & { submitter_email: string }) | undefined;
+
+  if (!row) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  // Admins cannot read drafts; only the owner can.
+  if (row.is_draft === 1 && row.submitter_id !== user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (user.role !== "admin" && row.submitter_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const attachments = fetchAttachmentsByIdeaId(id);
+  return NextResponse.json({ idea: row, attachments });
+}
+
+/**
+ * Owner-only edit. Used to update a draft, or to "finalise" a draft into a
+ * submission (when `is_draft=0` is sent). Submitted (non-draft) ideas can no
+ * longer be edited. Supports adding new files (`files`) and removing existing
+ * attachments by id (`remove_attachment_ids`).
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: rawId } = await params;
+  const id = Number(rawId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT * FROM ideas WHERE id = ?")
+    .get(id) as IdeaRow | undefined;
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (existing.submitter_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (existing.is_draft !== 1) {
+    return NextResponse.json(
+      { error: "Only drafts can be edited" },
+      { status: 409 },
+    );
+  }
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return NextResponse.json(
+      { error: "Expected multipart/form-data" },
+      { status: 400 },
+    );
+  }
+
+  const title = (form.get("title") ?? "").toString().trim();
+  const description = (form.get("description") ?? "").toString().trim();
+  const category = form.get("category");
+  const isDraft = form.get("is_draft") === "1";
+  const newFiles = [...pickFiles(form, "files"), ...pickFiles(form, "file")];
+  const removeIds = parseRemovalIds(form);
+
+  if (title.length < 3 || title.length > 200) {
+    return NextResponse.json(
+      { error: "Title must be 3-200 characters" },
+      { status: 400 },
+    );
+  }
+  if (description.length < 10) {
+    return NextResponse.json(
+      { error: "Description must be at least 10 characters" },
+      { status: 400 },
+    );
+  }
+  if (!isCategory(category)) {
+    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+  }
+
+  const extraDef = extraFieldFor(category);
+  const extraValues: Record<string, string> = {};
+  if (extraDef) {
+    const raw = form.get(extraDef.key);
+    if (typeof raw === "string") extraValues[extraDef.key] = raw;
+  }
+  const extraDetails = buildExtraDetails(category, extraValues);
+
+  // Update the idea row. The legacy file_path/file_name columns are cleared
+  // because the attachments table is now the single source of truth.
+  const now = Date.now();
+  db.prepare(
+    `UPDATE ideas
+        SET title = ?, description = ?, category = ?,
+            file_path = NULL, file_name = NULL,
+            is_draft = ?, extra_details = ?, updated_at = ?
+      WHERE id = ?`,
+  ).run(title, description, category, isDraft ? 1 : 0, extraDetails, now, id);
+
+  if (removeIds.length > 0) {
+    const placeholders = removeIds.map(() => "?").join(",");
+    db.prepare(
+      `DELETE FROM attachments
+        WHERE idea_id = ? AND id IN (${placeholders})`,
+    ).run(id, ...removeIds);
+  }
+
+  const saved = await persistAttachments(id, newFiles);
+  if (!saved.ok) {
+    return NextResponse.json({ error: saved.error }, { status: saved.status });
+  }
+
+  const idea = db
+    .prepare("SELECT * FROM ideas WHERE id = ?")
+    .get(id) as IdeaRow;
+  const attachments = fetchAttachmentsByIdeaId(id);
+  return NextResponse.json({ ok: true, idea, attachments });
+}

@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/* ────────────────────────────────────────────────────────────────────
+   InnovatEPAM design tokens
+   - Light: clean off-white with deep indigo accents
+   - Dark : near-black slate with vivid indigo + violet glow
+   ──────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #f7f7fb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #4338ca;          /* indigo-700 */
+  --primary-foreground: #ffffff;
+  --secondary: #eef2ff;        /* indigo-50 */
+  --secondary-foreground: #1e1b4b;
+  --muted: #f1f5f9;            /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+  --accent: #eef2ff;
+  --accent-foreground: #1e1b4b;
+  --destructive: #e11d48;      /* rose-600 */
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;           /* slate-200 */
+  --input: #e2e8f0;
+  --ring: #6366f1;             /* indigo-500 */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #070a18;
+    --foreground: #e2e8f0;
+    --card: rgba(17, 22, 41, 0.72);
+    --card-foreground: #e2e8f0;
+    --popover: #0c1024;
+    --popover-foreground: #e2e8f0;
+    --primary: #818cf8;        /* indigo-400 */
+    --primary-foreground: #0b1020;
+    --secondary: #1e213a;
+    --secondary-foreground: #cbd5e1;
+    --muted: #141a30;
+    --muted-foreground: #94a3b8;
+    --accent: #1e213a;
+    --accent-foreground: #e0e7ff;
+    --destructive: #fb7185;
+    --destructive-foreground: #1f0a14;
+    --border: rgba(148, 163, 184, 0.18);
+    --input: rgba(148, 163, 184, 0.24);
+    --ring: #a5b4fc;
+  }
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(99, 102, 241, 0.18), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 110%, rgba(168, 85, 247, 0.18), transparent 60%),
+    radial-gradient(40rem 40rem at 50% 120%, rgba(14, 165, 233, 0.12), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Reusable utility classes (Tailwind v4 lets us define raw CSS classes alongside @theme). */
+.glass-card {
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  box-shadow:
+    0 1px 0 0 color-mix(in oklab, white 30%, transparent) inset,
+    0 24px 64px -28px rgba(15, 23, 42, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-card {
+    background: linear-gradient(
+      180deg,
+      rgba(30, 33, 58, 0.65) 0%,
+      rgba(15, 19, 39, 0.65) 100%
+    );
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+      0 24px 64px -24px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.auth-aurora {
+  background:
+    radial-gradient(80rem 80rem at 0% 0%, rgba(99, 102, 241, 0.55), transparent 55%),
+    radial-gradient(60rem 60rem at 100% 100%, rgba(236, 72, 153, 0.45), transparent 60%),
+    linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
+}
